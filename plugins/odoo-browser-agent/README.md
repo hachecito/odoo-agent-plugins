@@ -112,7 +112,7 @@ npm test
 
 ## Estado
 
-v0.1.0. Pendiente de validar en un proyecto Odoo.sh real:
+v0.2.0. Pendiente de validar en un proyecto Odoo.sh real:
 - nombres exactos de las herramientas de Claude in Chrome;
 - qué herramienta del MCP de GitHub devuelve los commit statuses;
 - obtención automática del host SSH del último build;
