@@ -76,6 +76,10 @@ function main() {
       console.error(`Límite de ${MAX_FIX_CYCLES} ciclos superado: BLOCKED. Pedir ayuda al usuario.`);
       process.exit(1);
     }
+  } else if (cmd === 'close') {
+    // Ends the run so the guard goes back to idle mode (only direct production pushes blocked).
+    run.closed = true;
+    run.history.push({ at: now, state: run.state, note: `Ejecución cerrada${opt(args, 'note') ? `: ${opt(args, 'note')}` : ''}` });
   } else if (cmd === 'build-wait') {
     // Report minutes spent in REMOTE_BUILD and block the run when the configured limit is exceeded.
     const entered = [...run.history].reverse().find((h) => h.state === 'REMOTE_BUILD');
@@ -95,7 +99,7 @@ function main() {
     console.log(JSON.stringify({ waiting_minutes: Math.round(minutes * 10) / 10, limit_minutes: limit, poll_seconds: loaded.config.build_poll_seconds }));
     return;
   } else if (cmd !== 'show') {
-    console.error('Uso: run-state.js init --task "..." | state <ESTADO> [--note ...] | evidence ... | cycle | build-wait | show');
+    console.error('Uso: run-state.js init --task "..." | state <ESTADO> [--note ...] | evidence ... | cycle | build-wait | close [--note ...] | show');
     process.exit(1);
   }
   saveRun(root, run);

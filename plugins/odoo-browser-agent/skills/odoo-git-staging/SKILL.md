@@ -7,10 +7,20 @@ description: Reglas y procedimiento para trabajar con git sobre la rama staging 
 
 ## Reglas innegociables
 
-- Solo se trabaja y se hace push en la `staging_branch` de `.claude/odoo-agent.json`. Si no está definida, **preguntar al usuario** y configurarla con la skill `odoo-project-setup`. Nunca elegirla por cuenta propia.
-- **Nunca** commit, merge, rebase ni push contra una rama de producción. Nunca force push ni borrar ramas.
+- La verificación en Odoo.sh se hace en la `staging_branch` de `.claude/odoo-agent.json`. Si no está definida, **preguntar al usuario** y configurarla con la skill `odoo-project-setup`. Nunca elegirla por cuenta propia.
+- **Nunca** commit, merge, rebase ni push directo contra una rama de producción. Nunca force push ni borrar ramas durante la tarea.
+- **Pull requests contra producción: permitidos.** Si el usuario quiere llevar el cambio a producción mediante un PR, crear una rama propia (por ejemplo `fix/<tema>`), hacer push de esa rama (el hook pide confirmación) y crear el PR con `mcp__github__create_pull_request`. **No avisar de que esto vaya a bloquearse ni proponer reconfigurar el plugin**: no hace falta. Fusionar el PR lo hace siempre el usuario.
 - El hook `guard.js` aplica estas reglas: si deniega algo, **no intentar rodearlo** (otro comando, otra herramienta, MCP de GitHub, terminal de Odoo.sh, `odoosh-push`). Informar al usuario.
-- Todo cambio de código va por git local. No usar herramientas de escritura del MCP de GitHub.
+- Todo cambio de código va por git local. No usar herramientas de escritura del MCP de GitHub, salvo `create_pull_request`.
+
+### Cuándo aplica el hook
+
+| Situación | Qué bloquea o confirma |
+|---|---|
+| **Sin tarea del plugin en curso** (trabajo normal del usuario en el repo) | Solo **deniega el push directo a producción** (también con force o `--all`). Confirma la fusión de PRs con el MCP de GitHub. Todo lo demás (ramas, PRs, SSH, Chrome) queda libre. |
+| **Durante una tarea** (`run-state.js init` hasta COMPLETED/FAILED o `run-state.js close`) | Política completa: push a staging y a ramas feature con confirmación; producción, force push, borrado de ramas, SSH a producción y escrituras remotas, denegados. |
+
+Una tarea que lleva más de 24 h sin actividad se considera cerrada.
 
 ## Antes de tocar nada
 

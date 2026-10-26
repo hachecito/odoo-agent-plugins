@@ -20,6 +20,7 @@ function decide(tool, input, opts = {}) {
     {
       loadConfig: () => (config ? { config, root: '.', path: '.' } : null),
       branchOf: () => (opts.branch === undefined ? 'staging-agent' : opts.branch),
+      runActive: () => opts.active !== false,
     },
   );
   return res ? res.decision : null;
@@ -36,6 +37,33 @@ test('push to staging asks for confirmation', () => {
   assert.strictEqual(bash('git push origin HEAD:refs/heads/staging-agent'), 'ask');
 });
 
+test('outside a plugin task only direct production pushes are blocked', () => {
+  const idle = { active: false };
+  assert.strictEqual(bash('git push origin main', idle), 'deny');
+  assert.strictEqual(bash('git push --force origin main', idle), 'deny');
+  assert.strictEqual(bash('git push origin feature:main', idle), 'deny');
+  assert.strictEqual(bash('git push', { ...idle, branch: 'main' }), 'deny');
+  assert.strictEqual(bash('git push --all', idle), 'deny');
+  // Feature branches for PRs, force push to own branches, local work, SSH and browser are free.
+  assert.strictEqual(bash('git push -u origin fix/mi-cambio', idle), null);
+  assert.strictEqual(bash('git push', { ...idle, branch: 'fix/mi-cambio' }), null);
+  assert.strictEqual(bash('git push --force-with-lease origin fix/mi-cambio', idle), null);
+  assert.strictEqual(bash('git commit -m x', { ...idle, branch: 'main' }), null);
+  assert.strictEqual(bash('git branch -D old', idle), null);
+  assert.strictEqual(bash('ssh 1@myproject.odoo.com', idle), null);
+  assert.strictEqual(decide('mcp__claude-in-chrome__navigate', { url: 'https://evil.example.com' }, idle), null);
+  assert.strictEqual(decide('mcp__github__create_pull_request', { base: 'main' }, idle), null);
+  assert.strictEqual(decide('mcp__github__merge_pull_request', { pullNumber: 1 }, idle), 'ask');
+  // Guard config is still protected.
+  assert.strictEqual(decide('Edit', { file_path: '/r/.claude/odoo-agent.json' }, idle), 'ask');
+});
+
+test('during a task a feature branch push for a PR asks, production still denied', () => {
+  assert.strictEqual(bash('git push -u origin fix/mi-cambio'), 'ask');
+  assert.strictEqual(bash('git push origin fix/mi-cambio:main'), 'deny');
+  assert.strictEqual(decide('mcp__github__create_pull_request', { base: 'main', head: 'fix/mi-cambio' }), null);
+});
+
 test('push without explicit refspec is denied', () => {
   assert.strictEqual(bash('git push'), 'deny');
   assert.strictEqual(bash('git push origin'), 'deny');
@@ -46,7 +74,7 @@ test('push without explicit refspec is denied', () => {
 test('push to production or other branches is denied', () => {
   assert.strictEqual(bash('git push origin main'), 'deny');
   assert.strictEqual(bash('git push origin staging-agent:main'), 'deny');
-  assert.strictEqual(bash('git push origin feature-x'), 'deny');
+  assert.strictEqual(bash('git push origin feature-x'), 'ask');
   assert.strictEqual(bash('git push origin HEAD', { branch: 'main' }), 'deny');
   assert.strictEqual(bash('git push origin staging-agent main'), 'deny');
 });
@@ -56,7 +84,7 @@ test('config is resolved from the directory where git runs', () => {
   const repo = path.resolve('/work/odoo/18/custom');
   const loadConfig = (dir) => (path.resolve(dir) === repo ? { config: CONFIG } : null);
   const run = (command, cwd) => {
-    const r = evaluate({ tool_name: 'Bash', tool_input: { command }, cwd }, { loadConfig, branchOf: () => 'staging-agent' });
+    const r = evaluate({ tool_name: 'Bash', tool_input: { command }, cwd }, { loadConfig, branchOf: () => 'staging-agent', runActive: () => true });
     return r ? r.decision : null;
   };
   const parent = path.resolve('/work/odoo/18');

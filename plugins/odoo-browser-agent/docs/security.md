@@ -11,11 +11,16 @@
 
 ## Controles deterministas (`scripts/guard.js`, hook PreToolUse)
 
-Solo se activa en repos con `.claude/odoo-agent.json`. Analiza:
+Solo se activa en repos con `.claude/odoo-agent.json`, y con dos modos:
+
+- **Sin tarea del plugin en curso** (trabajo normal): solo deniega el **push directo a una rama de producción** (incluido force push, `--all`, `--mirror` y push sin refspec estando en producción) y pide confirmación para fusionar PRs con el MCP de GitHub y para editar la configuración del guard. Ramas, PRs, SSH y Chrome quedan libres.
+- **Durante una tarea** (desde `run-state.js init` hasta `COMPLETED`, `FAILED` o `run-state.js close`; una tarea sin actividad en 24 h se considera cerrada): se aplica todo lo siguiente.
+
+Política durante una tarea:
 
 - **Bash / PowerShell**: comandos encadenados (`&&`, `;`, `|`), `git -C`, `cd`, shells anidadas (`bash -c`, `powershell -Command`, `cmd /c`) y rutas a `git.exe`.
   - La config se busca en el directorio donde realmente se ejecuta git (`git -C`, `cd`), no solo en el de la sesión.
-  - `git push`: denegado sin remoto y rama explícitos (`git push origin <staging>`), sin `staging_branch`, a ramas distintas de staging, a producción, con `--force*`, `+refspec`, `:rama`, `--delete`, `--mirror`, `--all`; push a staging → confirmación.
+  - `git push`: a staging o a una rama feature (por ejemplo para un PR contra producción) → confirmación; denegado sin remoto y rama explícitos (`git push origin <rama>`), sin `staging_branch`, a producción, con `--force*`, `+refspec`, `:rama`, `--delete`, `--mirror`, `--all`; push a staging → confirmación.
   - `git branch -d/-D`, `reset --hard`, `clean -f`, `filter-branch`, `update-ref` → denegado.
   - `commit/merge/rebase/cherry-pick/revert/am/pull` estando en una rama de producción → denegado.
   - `checkout --`, `restore`, `stash drop/clear`, `remote set-url` → confirmación.

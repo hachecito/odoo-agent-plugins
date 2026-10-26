@@ -68,7 +68,7 @@ test('notes: operational knowledge accepted, rules and secrets rejected', () => 
 
 test('notes file cannot be edited directly without confirmation', () => {
   const { evaluate } = require('../scripts/lib/policy');
-  const d = { loadConfig: () => null, branchOf: () => 'stg' };
+  const d = { loadConfig: () => null, branchOf: () => 'stg', runActive: () => true };
   assert.strictEqual(evaluate({ tool_name: 'Edit', tool_input: { file_path: 'C:\\r\\.claude\\odoo-agent-notes.json' } }, d).decision, 'ask');
   assert.strictEqual(evaluate({ tool_name: 'Bash', tool_input: { command: 'echo x > .claude/odoo-agent-notes.json' } }, d).decision, 'ask');
 });
@@ -96,6 +96,29 @@ test('throttle: browser calls spaced while waiting for build', async () => {
   await throttleBrowser(loaded, sleep);            // first call: no previous timestamp
   const waited = await throttleBrowser(loaded, sleep); // immediate second call must wait ~60 s
   assert.ok(waited > 55000 && waited <= 60000, String(waited));
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('run activity: closed, finished or stale runs are inactive', () => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const { isRunActive } = require('../scripts/lib/run');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'odoo-agent-'));
+  fs.mkdirSync(path.join(root, '.claude'));
+  const write = (run) => fs.writeFileSync(path.join(root, '.claude', 'odoo-agent-run.json'), JSON.stringify(run));
+  const now = Date.parse('2026-10-26T12:00:00Z');
+  assert.strictEqual(isRunActive(root, now), false);
+  write({ state: 'IMPLEMENTATION', history: [{ at: '2026-10-26T11:00:00Z' }] });
+  assert.strictEqual(isRunActive(root, now), true);
+  write({ state: 'BLOCKED', history: [{ at: '2026-10-26T11:00:00Z' }] });
+  assert.strictEqual(isRunActive(root, now), true);
+  write({ state: 'COMPLETED', history: [{ at: '2026-10-26T11:00:00Z' }] });
+  assert.strictEqual(isRunActive(root, now), false);
+  write({ state: 'IMPLEMENTATION', closed: true, history: [{ at: '2026-10-26T11:00:00Z' }] });
+  assert.strictEqual(isRunActive(root, now), false);
+  write({ state: 'IMPLEMENTATION', history: [{ at: '2026-10-24T11:00:00Z' }] });
+  assert.strictEqual(isRunActive(root, now), false);
   fs.rmSync(root, { recursive: true, force: true });
 });
 
