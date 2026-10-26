@@ -45,9 +45,9 @@ test('outside a plugin task only direct production pushes are blocked', () => {
   assert.strictEqual(bash('git push', { ...idle, branch: 'main' }), 'deny');
   assert.strictEqual(bash('git push --all', idle), 'deny');
   // Feature branches for PRs, force push to own branches, local work, SSH and browser are free.
-  assert.strictEqual(bash('git push -u origin fix/a7-v15', idle), null);
-  assert.strictEqual(bash('git push', { ...idle, branch: 'fix/a7-v15' }), null);
-  assert.strictEqual(bash('git push --force-with-lease origin fix/a7-v15', idle), null);
+  assert.strictEqual(bash('git push -u origin fix/mi-cambio', idle), null);
+  assert.strictEqual(bash('git push', { ...idle, branch: 'fix/mi-cambio' }), null);
+  assert.strictEqual(bash('git push --force-with-lease origin fix/mi-cambio', idle), null);
   assert.strictEqual(bash('git commit -m x', { ...idle, branch: 'main' }), null);
   assert.strictEqual(bash('git branch -D old', idle), null);
   assert.strictEqual(bash('ssh 1@myproject.odoo.com', idle), null);
@@ -59,9 +59,9 @@ test('outside a plugin task only direct production pushes are blocked', () => {
 });
 
 test('during a task a feature branch push for a PR asks, production still denied', () => {
-  assert.strictEqual(bash('git push -u origin fix/a7-v15'), 'ask');
-  assert.strictEqual(bash('git push origin fix/a7-v15:main'), 'deny');
-  assert.strictEqual(decide('mcp__github__create_pull_request', { base: 'main', head: 'fix/a7-v15' }), null);
+  assert.strictEqual(bash('git push -u origin fix/mi-cambio'), 'ask');
+  assert.strictEqual(bash('git push origin fix/mi-cambio:main'), 'deny');
+  assert.strictEqual(decide('mcp__github__create_pull_request', { base: 'main', head: 'fix/mi-cambio' }), null);
 });
 
 test('push without explicit refspec is denied', () => {
