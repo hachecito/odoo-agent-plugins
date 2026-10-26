@@ -40,6 +40,23 @@ function saveRun(root, run) {
   fs.writeFileSync(runPath(root), JSON.stringify(run, null, 2) + '\n', 'utf8');
 }
 
+// States that close a run; a run idle for longer than RUN_STALE_HOURS is also considered closed.
+const CLOSED_STATES = ['COMPLETED', 'FAILED'];
+const RUN_STALE_HOURS = 24;
+
+/**
+ * Tell whether an odoo-task run is in progress (guard applies full policy only then).
+ * @param {string} root - repo root
+ * @param {number} nowMs - current epoch ms
+ * @returns {boolean} true if a run is active
+ */
+function isRunActive(root, nowMs = Date.now()) {
+  const run = loadRun(root);
+  if (!run || run.closed || CLOSED_STATES.includes(run.state)) return false;
+  const last = (run.history && run.history.length) ? run.history[run.history.length - 1].at : run.started_at;
+  return nowMs - Date.parse(last) < RUN_STALE_HOURS * 3600 * 1000;
+}
+
 /**
  * Compute the final verdict from recorded evidence.
  * @param {object} run - run state
@@ -58,4 +75,4 @@ function verdict(run) {
   return { verdict: v, missing, failed, skipped };
 }
 
-module.exports = { STATES, REQUIRED_EVIDENCE, EVIDENCE_STATUS, loadRun, saveRun, verdict, runPath };
+module.exports = { STATES, REQUIRED_EVIDENCE, EVIDENCE_STATUS, RUN_STALE_HOURS, loadRun, saveRun, verdict, runPath, isRunActive };

@@ -56,7 +56,7 @@ Scripts (rutas absolutas): `node "${CLAUDE_PLUGIN_ROOT}/scripts/<script>.js"`. A
 ### 9. FINAL_VERIFICATION
 1. `run-state.js state FINAL_VERIFICATION`.
 2. Lanzar el subagente `odoo-verifier` para que revise el diff y las evidencias.
-3. Si el verificador aprueba y no falta evidencia: `run-state.js state COMPLETED`. Si no, dejar el estado como está.
+3. Si el verificador aprueba y no falta evidencia: `run-state.js state COMPLETED`. Si no, dejar el estado como está y, cuando el usuario dé la tarea por terminada o abandonada, ejecutar `run-state.js close`: así el hook vuelve al modo libre (solo bloquea el push directo a producción).
 4. **Lecciones aprendidas** (también si la tarea terminó FALLIDA o BLOQUEADA): registrar entre 0 y 5 notas con lo que costó descubrir y servirá la próxima vez:
    `node "${CLAUDE_PLUGIN_ROOT}/scripts/notes.js" add --section <entorno|comandos|modulos|tests|odoo-sh|problemas|otros> --text "..." --source "<tarea breve>"`
    - Solo hechos **comprobados en esta ejecución** (un comando que funcionó, una ruta, un host, un módulo con tests lentos, un error recurrente y su solución). No suposiciones.

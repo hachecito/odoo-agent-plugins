@@ -5,6 +5,7 @@ const { execFileSync } = require('child_process');
 const { evaluate, ASK, DENY, CHROME_TOOL } = require('./lib/policy');
 const { loadConfig } = require('./lib/config');
 const { throttleBrowser } = require('./lib/throttle');
+const { isRunActive } = require('./lib/run');
 
 /**
  * Return the current branch of a git working tree.
@@ -50,7 +51,7 @@ function main() {
       process.exit(0);
     }
     try {
-      const result = evaluate(event, { loadConfig, branchOf });
+      const result = evaluate(event, { loadConfig, branchOf, runActive: (root) => isRunActive(root) });
       // While waiting for an Odoo.sh build, space out allowed browser calls instead of letting the agent poll.
       if (CHROME_TOOL.test(event.tool_name || '') && !(result && result.decision === DENY)) {
         const loaded = loadConfig(event.cwd || process.cwd());

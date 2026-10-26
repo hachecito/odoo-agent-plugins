@@ -88,30 +88,74 @@ function isProductionHost(host, config) {
 }
 
 /**
- * Evaluate a `git push` invocation.
+ * Split `git push` arguments into flags and refspecs.
  * @param {string[]} args - tokens after "push"
- * @param {object} ctx - {config, branchOf(dir), dir}
- * @returns {{decision: string, reason: string}} decision
+ * @returns {{force: boolean, destructive: string|null, tags: boolean, refspecs: string[]}} parsed push
  */
-function evaluatePush(args, ctx) {
-  const { config } = ctx;
+function parsePush(args) {
   const positional = [];
+  let force = false;
+  let destructive = null;
   let tags = false;
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (/^--force(-with-lease|-if-includes)?(=.*)?$/.test(a) || hasShortFlag(a, 'f')) {
-      return { decision: DENY, reason: 'Force push bloqueado por odoo-browser-agent.' };
-    }
+    if (/^--force(-with-lease|-if-includes)?(=.*)?$/.test(a) || hasShortFlag(a, 'f')) { force = true; continue; }
     if (a === '--delete' || hasShortFlag(a, 'd') || a === '--mirror' || a === '--all' || a === '--branches' || a === '--prune') {
-      return { decision: DENY, reason: `git push ${a} bloqueado (puede borrar o sobrescribir ramas remotas).` };
+      destructive = destructive || a;
+      continue;
     }
     if (a === '--tags') { tags = true; continue; }
     if (['-o', '--push-option', '--repo', '--receive-pack', '--exec'].includes(a)) { i++; continue; }
     if (a.startsWith('-')) continue;
     positional.push(a);
   }
+  return { force, destructive, tags, refspecs: positional.slice(1) };
+}
 
-  const refspecs = positional.slice(1);
+/**
+ * Resolve the destination branch of a refspec (src:dst, +dst, :dst, HEAD).
+ * @param {string} spec - refspec
+ * @param {object} ctx - {branchOf(dir), dir}
+ * @returns {string|null} destination branch, or null if unknown
+ */
+function refspecTarget(spec, ctx) {
+  let dst = spec.replace(/^\+/, '');
+  dst = dst.includes(':') ? dst.split(':').pop() : dst;
+  if (dst === 'HEAD' || dst === '@') return ctx.branchOf(ctx.dir);
+  return shortRef(dst);
+}
+
+/**
+ * Outside a plugin task only direct pushes to production are blocked.
+ * @param {string[]} args - tokens after "push"
+ * @param {object} ctx - {config, branchOf(dir), dir}
+ * @returns {{decision: string, reason: string}|null} decision
+ */
+function evaluatePushIdle(args, ctx) {
+  const prod = ctx.config.production_branches;
+  const { destructive, refspecs } = parsePush(args);
+  if (['--mirror', '--all', '--branches'].includes(destructive)) {
+    return { decision: DENY, reason: `git push ${destructive} puede incluir la rama de producción.` };
+  }
+  const targets = refspecs.length ? refspecs.map((s) => refspecTarget(s, ctx)) : [ctx.branchOf(ctx.dir)];
+  const hit = targets.find((t) => t && prod.includes(t));
+  if (hit) return { decision: DENY, reason: `Push directo a la rama de producción "${hit}" bloqueado: en Odoo.sh despliega al cliente. Usar una rama y un PR.` };
+  if (targets.includes(null)) return { decision: ASK, reason: 'No se pudo determinar la rama destino del push: confirmar que no es producción.' };
+  return null;
+}
+
+/**
+ * Evaluate a `git push` invocation during a plugin task.
+ * @param {string[]} args - tokens after "push"
+ * @param {object} ctx - {config, branchOf(dir), dir}
+ * @returns {{decision: string, reason: string}} decision
+ */
+function evaluatePush(args, ctx) {
+  const { config } = ctx;
+  const { force, destructive, tags, refspecs } = parsePush(args);
+  if (force) return { decision: DENY, reason: 'Force push bloqueado por odoo-browser-agent.' };
+  if (destructive) return { decision: DENY, reason: `git push ${destructive} bloqueado (puede borrar o sobrescribir ramas remotas).` };
+
   if (!refspecs.length) {
     // Without a refspec the destination depends on push.default/upstream config: require it explicitly.
     return { decision: DENY, reason: `Indicar remoto y rama explícitos: git push origin ${config.staging_branch || '<rama-staging>'}.` };
@@ -139,7 +183,8 @@ function evaluatePush(args, ctx) {
   }
   const others = targets.filter((t) => t !== config.staging_branch);
   if (others.length) {
-    return { decision: DENY, reason: `Solo se permite push a la rama staging "${config.staging_branch}" (destino: ${others.join(', ')}).` };
+    // Feature branches (e.g. for a PR against production) are allowed after confirmation.
+    return { decision: ASK, reason: `Push a una rama que no es la staging "${config.staging_branch}" (destino: ${others.join(', ')}): confirmar.` };
   }
   return { decision: ASK, reason: `Confirmar push a la rama staging "${config.staging_branch}"${tags ? ' (incluye tags)' : ''}.` };
 }
@@ -167,6 +212,8 @@ function evaluateGit(tokens, ctx) {
   const args = tokens.slice(i + 1);
   const local = { ...ctx, config, dir };
   if (!sub) return null;
+  // Outside an active plugin task the user works freely; only direct pushes to production are blocked.
+  if (!ctx.runActive(loaded.root)) return sub === 'push' ? evaluatePushIdle(args, local) : null;
   if (pushConfig) return { decision: ASK, reason: 'git -c push.*/remote.* altera el destino de los push: confirmar.' };
 
   switch (sub) {
@@ -242,9 +289,9 @@ function evaluateRemoteText(text) {
 }
 
 /**
- * Evaluate an ssh invocation (tokens after "ssh"). Applies even without project config.
+ * Evaluate an ssh invocation (tokens after "ssh"). Only applies during an active plugin task.
  * @param {string[]} args - ssh arguments
- * @param {object} ctx - {loadConfig(dir), dir}
+ * @param {object} ctx - {loadConfig(dir), runActive(root), dir}
  * @returns {{decision: string, reason: string}|null} decision
  */
 function evaluateSsh(args, ctx) {
@@ -256,7 +303,8 @@ function evaluateSsh(args, ctx) {
   const host = dest.split('@').pop().toLowerCase();
   if (!/\.odoo\.com$/.test(host)) return null;
   const loaded = ctx.loadConfig(ctx.dir);
-  const config = loaded ? loaded.config : {};
+  if (!loaded || !ctx.runActive(loaded.root)) return null;
+  const config = loaded.config;
   if (isProductionHost(host, config)) {
     return { decision: DENY, reason: `SSH a "${host}" bloqueado: se trata como producción (solo se permiten builds *.dev.odoo.com).` };
   }
@@ -289,6 +337,7 @@ function evaluateConfigWrite(tokens, raw) {
 function evaluateCommand(command, ctx, depth = 0) {
   const results = [];
   let dir = ctx.dir;
+  if (!ctx.seen) ctx = { ...ctx, seen: { push: false } };
   for (const tokens of splitCommand(command)) {
     const prog = programName(tokens[0]);
     const rest = tokens.slice(1);
@@ -298,17 +347,18 @@ function evaluateCommand(command, ctx, depth = 0) {
     }
     const local = { ...ctx, dir };
     results.push(evaluateConfigWrite(tokens, tokens.join(' ')));
-    if (prog === 'git') results.push(evaluateGit(rest, local));
-    else if (prog === 'ssh') results.push(evaluateSsh(rest, local));
-    else if (prog === 'odoosh-push') results.push(evaluateRemoteText('odoosh-push'));
+    if (prog === 'git') {
+      if (rest.includes('push')) ctx.seen.push = true;
+      results.push(evaluateGit(rest, local));
+    } else if (prog === 'ssh') results.push(evaluateSsh(rest, local));
     // Nested shells: bash -c "...", powershell -Command "...", cmd /c "..."
     if (depth < 3 && ['bash', 'sh', 'powershell', 'pwsh', 'cmd'].includes(prog)) {
       for (const t of rest) if (/\s/.test(t)) results.push(evaluateCommand(t, local, depth + 1));
     }
   }
   const merged = strictest(results);
-  // Every parsed push inside a configured repo yields a decision; a leftover push-like text is suspicious.
-  if (!merged && depth === 0 && ctx.loadConfig(dir) && /\bgit(\.exe)?["']?(\s+-\S+(\s+\S+)?)*\s+push\b/i.test(command)) {
+  // A push-like text that the parser did not recognize as a git push is suspicious.
+  if (!merged && depth === 0 && !ctx.seen.push && ctx.loadConfig(dir) && /\bgit(\.exe)?["']?(\s+-\S+(\s+\S+)?)*\s+push\b/i.test(command)) {
     return { decision: ASK, reason: 'Posible git push que no se pudo analizar: confirmar.' };
   }
   return merged;
@@ -366,7 +416,7 @@ function evaluateChrome(toolName, toolInput, ctx) {
 /**
  * Main policy entry point for a PreToolUse event.
  * @param {object} event - hook input {tool_name, tool_input, cwd}
- * @param {object} deps - {loadConfig(dir), branchOf(dir)}
+ * @param {object} deps - {loadConfig(dir), branchOf(dir), runActive(root)}
  * @returns {{decision: string, reason: string}|null} decision, null = no opinion
  */
 function evaluate(event, deps) {
@@ -382,12 +432,18 @@ function evaluate(event, deps) {
   }
   // Shell commands resolve the config per directory (git -C, cd), so they are not gated on cwd.
   if (SHELL_TOOLS.has(name)) {
-    return evaluateCommand(String(input.command || ''), { loadConfig: deps.loadConfig, branchOf: deps.branchOf, dir: cwd });
+    return evaluateCommand(String(input.command || ''), { loadConfig: deps.loadConfig, branchOf: deps.branchOf, runActive: deps.runActive, dir: cwd });
   }
 
   const loaded = deps.loadConfig(cwd);
   if (!loaded) return null; // MCP rules only apply in sessions started inside a configured repo
   const ctx = { config: loaded.config, branchOf: deps.branchOf, dir: cwd };
+  if (!deps.runActive(loaded.root)) {
+    // Outside a plugin task: merging a PR may deploy to production, everything else is free.
+    return name === 'mcp__github__merge_pull_request'
+      ? { decision: ASK, reason: 'Fusionar un PR puede desplegar en producción si su base es la rama de producción: confirmar.' }
+      : null;
+  }
   if (name.startsWith('mcp__github__')) {
     const tool = name.slice('mcp__github__'.length);
     if (GITHUB_WRITE_TOOLS.has(tool)) {

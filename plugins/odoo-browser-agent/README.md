@@ -97,7 +97,7 @@ Sin SSH, el agente usa la terminal del editor web (`https://<build>/odoo-sh/edit
 
 ## Seguridad
 
-Ver [docs/security.md](docs/security.md). En resumen: push solo a la rama staging y con confirmación; producción, force push y borrado de ramas bloqueados; la interfaz de Odoo.sh es de solo lectura para el agente.
+Ver [docs/security.md](docs/security.md). En resumen: las protecciones completas solo actúan **durante una tarea del plugin** (push a staging o a ramas feature con confirmación; producción, force push y borrado de ramas bloqueados; la interfaz de Odoo.sh es de solo lectura para el agente). Fuera de una tarea, el hook solo impide el push directo a la rama de producción: crear ramas y pull requests contra producción es libre.
 
 ## Tests
 
@@ -112,7 +112,7 @@ npm test
 
 ## Estado
 
-v0.2.0. Pendiente de validar en un proyecto Odoo.sh real:
+v0.3.0. Pendiente de validar en un proyecto Odoo.sh real:
 - nombres exactos de las herramientas de Claude in Chrome;
 - qué herramienta del MCP de GitHub devuelve los commit statuses;
 - obtención automática del host SSH del último build;
