@@ -1,0 +1,3 @@
+node_modules/
+.claude/odoo-agent-run.json
+.claude/settings.local.json

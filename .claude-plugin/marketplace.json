@@ -1,0 +1,12 @@
+{
+  "name": "odoo-agent-plugins",
+  "owner": { "name": "Octupus Technologies" },
+  "description": "Herramientas de Claude Code para desarrollo Odoo y Odoo.sh.",
+  "plugins": [
+    {
+      "name": "odoo-browser-agent",
+      "source": "./plugins/odoo-browser-agent",
+      "description": "Agente para tareas Odoo end-to-end sobre ramas staging de Odoo.sh."
+    }
+  ]
+}
