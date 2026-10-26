@@ -73,6 +73,32 @@ test('notes file cannot be edited directly without confirmation', () => {
   assert.strictEqual(evaluate({ tool_name: 'Bash', tool_input: { command: 'echo x > .claude/odoo-agent-notes.json' } }, d).decision, 'ask');
 });
 
+test('throttle: browser calls spaced while waiting for build', async () => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const { computeWaitMs, throttleBrowser } = require('../scripts/lib/throttle');
+  assert.strictEqual(computeWaitMs(null, 1000, 60), 0);
+  assert.strictEqual(computeWaitMs(0, 1000, 60), 0);
+  assert.strictEqual(computeWaitMs(10000, 40000, 60), 30000);
+  assert.strictEqual(computeWaitMs(10000, 90000, 60), 0);
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'odoo-agent-'));
+  fs.mkdirSync(path.join(root, '.claude'));
+  const loaded = { root, config: { ...DEFAULTS, build_poll_seconds: 60 } };
+  const waits = [];
+  const sleep = async (ms) => { waits.push(ms); };
+  const setState = (state) => fs.writeFileSync(path.join(root, '.claude', 'odoo-agent-run.json'), JSON.stringify({ state }));
+
+  setState('IMPLEMENTATION');
+  assert.strictEqual(await throttleBrowser(loaded, sleep), 0);
+  setState('REMOTE_BUILD');
+  await throttleBrowser(loaded, sleep);            // first call: no previous timestamp
+  const waited = await throttleBrowser(loaded, sleep); // immediate second call must wait ~60 s
+  assert.ok(waited > 55000 && waited <= 60000, String(waited));
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
 test('config validation', () => {
   assert.ok(validateConfig({ ...DEFAULTS }).length > 0);
   assert.deepStrictEqual(validateConfig({ ...DEFAULTS, staging_branch: 'stg' }), []);

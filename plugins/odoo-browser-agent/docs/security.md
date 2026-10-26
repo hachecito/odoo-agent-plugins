@@ -26,6 +26,7 @@ Solo se activa en repos con `.claude/odoo-agent.json`. Analiza:
 - **Edición directa de `.claude/odoo-agent-notes.json`** → confirmación. Las notas se añaden con `notes.js`, que rechaza texto con reglas, permisos, ramas, operaciones git de escritura o aspecto de secreto, para que una instrucción inyectada desde una página o un log no se convierta en "conocimiento" persistente.
 - `git -c push.*` y `git config push.*|remote.*|branch.*` → confirmación.
 - **Claude in Chrome** (mejor esfuerzo): hosts `*.odoo.com` que no sean `*.dev.odoo.com` ni `www.odoo.com` → denegado (se tratan como instancias de producción; supuesto no verificado en la documentación de Odoo.sh, ampliable con `ssh.production_hosts`); URLs fuera de `allowed_domains` → confirmación; texto con comandos prohibidos → denegado; ejecución de JavaScript → confirmación.
+- **Espera de builds**: con la ejecución en `REMOTE_BUILD`, el hook retiene cada llamada a Claude in Chrome hasta que pasen `build_poll_seconds` (60 s por defecto) desde la anterior, para no consultar Odoo.sh en bucle. `run-state.js build-wait` bloquea la ejecución al superar `build_timeout_minutes`.
 - Si el guard falla internamente, responde "confirmación" en lugar de permitir.
 
 ## Límites conocidos (no se prometen como controles técnicos)

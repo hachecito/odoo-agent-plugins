@@ -402,4 +402,4 @@ function evaluate(event, deps) {
   return null;
 }
 
-module.exports = { evaluate, evaluateCommand, evaluatePush, evaluateSsh, evaluateRemoteText, evaluateChrome, isProductionHost, DENY, ASK };
+module.exports = { evaluate, evaluateCommand, evaluatePush, evaluateSsh, evaluateRemoteText, evaluateChrome, isProductionHost, CHROME_TOOL, DENY, ASK };

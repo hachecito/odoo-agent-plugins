@@ -27,11 +27,13 @@ Las protecciones del plugin (hook `guard.js`) **solo se activan en repos con est
    .claude/odoo-agent.json
    .claude/odoo-agent-run.json
    .claude/odoo-agent-notes.json
+   .claude/odoo-agent-throttle.json
    ```
 6. **Comprobar canales** y anotar el resultado al usuario:
    - **Claude in Chrome**: comprobar que hay herramientas `mcp__claude-in-chrome__*` disponibles. Si no, indicar al usuario que arranque con `claude --chrome` o ejecute `/chrome`. Un plugin no puede activarlo.
    - **GitHub**: confirmar que el MCP `github` responde (por ejemplo, leer el último commit de la rama staging).
-   - **SSH a Odoo.sh** (opcional): pedir al usuario el comando SSH de un build de la rama staging (Odoo.sh → rama → pestaña SSH; formato `<build_id>@<dominio>.dev.odoo.com`) y ejecutar:
+   - **Etapas en Odoo.sh** (si Claude in Chrome está disponible): abrir el proyecto en Odoo.sh y comprobar en el panel izquierdo que la rama staging aparece bajo *Staging* y que las ramas bajo *Production* coinciden con `production_branches` (ver `skills/odoo-sh-remote/reference/odoo-sh-ui.md`). Si no coinciden, avisar y corregir la configuración con el usuario.
+   - **SSH a Odoo.sh** (opcional): obtener el comando SSH del build de la rama staging, leyéndolo con Claude in Chrome en Odoo.sh (rama → botón **SSH**, campo de texto con `ssh <build_id>@<dominio>.dev.odoo.com`) o pidiéndolo al usuario, y ejecutar:
      `node "${CLAUDE_PLUGIN_ROOT}/scripts/ssh-check.js" <build_id>@<dominio>`
      - `OK` → `node "${CLAUDE_PLUGIN_ROOT}/scripts/config.js" set-ssh --enabled true` y guardar el host como nota para no volver a pedirlo: `node "${CLAUDE_PLUGIN_ROOT}/scripts/notes.js" add --section odoo-sh --text "Host SSH del build staging: <build_id>@<dominio>" --source "setup"`. Si en otra tarea el host deja de responder (el build pudo cambiar), pedir el nuevo al usuario y sustituir la nota.
      - `EXEC_INTERMITTENT` → la clave funciona; reintentar más tarde o usar el terminal del editor.

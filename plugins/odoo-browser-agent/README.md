@@ -57,11 +57,13 @@ Desarrollo local sin instalar, desde la raíz del repositorio: `claude --plugin-
   "production_branches": ["main"],
   "odoo_version": "18.0",
   "ssh": { "enabled": true, "key": null },
-  "allowed_domains": ["odoo.sh", "odoo.com", "github.com"]
+  "allowed_domains": ["odoo.sh", "odoo.com", "github.com"],
+  "build_poll_seconds": 60,
+  "build_timeout_minutes": 60
 }
 ```
 
-Excluir los archivos del agente sin tocar el `.gitignore` del cliente, añadiéndolos a `.git/info/exclude`: `.claude/odoo-agent.json`, `.claude/odoo-agent-run.json`, `.claude/odoo-agent-notes.json`.
+Excluir los archivos del agente sin tocar el `.gitignore` del cliente, añadiéndolos a `.git/info/exclude`: `.claude/odoo-agent.json`, `.claude/odoo-agent-run.json`, `.claude/odoo-agent-notes.json`, `.claude/odoo-agent-throttle.json`.
 
 ### Aprendizaje por proyecto (`.claude/odoo-agent-notes.json`)
 
@@ -110,7 +112,7 @@ npm test
 
 ## Estado
 
-v0.1.0. Pendiente de validar en un proyecto Odoo.sh real:
+v0.2.0. Pendiente de validar en un proyecto Odoo.sh real:
 - nombres exactos de las herramientas de Claude in Chrome;
 - qué herramienta del MCP de GitHub devuelve los commit statuses;
 - obtención automática del host SSH del último build;

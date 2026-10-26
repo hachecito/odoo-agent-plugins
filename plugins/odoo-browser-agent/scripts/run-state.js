@@ -76,8 +76,26 @@ function main() {
       console.error(`Límite de ${MAX_FIX_CYCLES} ciclos superado: BLOCKED. Pedir ayuda al usuario.`);
       process.exit(1);
     }
+  } else if (cmd === 'build-wait') {
+    // Report minutes spent in REMOTE_BUILD and block the run when the configured limit is exceeded.
+    const entered = [...run.history].reverse().find((h) => h.state === 'REMOTE_BUILD');
+    if (run.state !== 'REMOTE_BUILD' || !entered) {
+      console.error('La ejecución no está en REMOTE_BUILD.');
+      process.exit(1);
+    }
+    const minutes = (Date.parse(now) - Date.parse(entered.at)) / 60000;
+    const limit = loaded.config.build_timeout_minutes;
+    if (minutes > limit) {
+      run.state = 'BLOCKED';
+      run.history.push({ at: now, state: 'BLOCKED', note: `Build de Odoo.sh sin terminar tras ${limit} min` });
+      saveRun(root, run);
+      console.error(`Límite de espera del build (${limit} min) superado: BLOCKED. Avisar al usuario.`);
+      process.exit(1);
+    }
+    console.log(JSON.stringify({ waiting_minutes: Math.round(minutes * 10) / 10, limit_minutes: limit, poll_seconds: loaded.config.build_poll_seconds }));
+    return;
   } else if (cmd !== 'show') {
-    console.error('Uso: run-state.js init --task "..." | state <ESTADO> [--note ...] | evidence ... | cycle | show');
+    console.error('Uso: run-state.js init --task "..." | state <ESTADO> [--note ...] | evidence ... | cycle | build-wait | show');
     process.exit(1);
   }
   saveRun(root, run);
