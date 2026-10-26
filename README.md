@@ -15,6 +15,13 @@ claude plugin marketplace add hachecito/odoo-agent-plugins      # o la ruta loca
 claude plugin install <plugin>@odoo-agent-plugins
 ```
 
+## Actualización
+
+```powershell
+claude plugin marketplace update odoo-agent-plugins
+claude plugin update odoo-browser-agent@odoo-agent-plugins     # comprobar claude plugin list --> nueva versión
+```
+
 ## Estructura
 
 ```
