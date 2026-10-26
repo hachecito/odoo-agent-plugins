@@ -25,9 +25,25 @@ Ante cualquier duda sobre comandos, ORM o tests de la versión del proyecto, con
 ## 1. Localizar el build
 
 El MCP de GitHub configurado **no expone** el commit status ni los check runs (comprobado en la primera prueba real). Orden de preferencia:
-1. **SSH** (si `ssh.enabled`): conectarse al build de la rama staging y comprobar que el commit desplegado coincide con el push: `ssh <build>@<host> "git -C ~/src/user rev-parse HEAD"`, y revisar `~/logs/update.log` / `odoo.log`.
+1. **SSH** (si `ssh.enabled`): conectarse al build de la rama staging y comprobar que el commit desplegado coincide con el push: `ssh <build>@<host> "git -C ~/src/user rev-parse HEAD"`, y revisar `~/logs/update.log` / `odoo.log`. El host sale de las notas del proyecto; si no está o no responde, leerlo en Odoo.sh (botón **SSH** de la rama, paso 3) y actualizar la nota.
 2. `gh api repos/<owner>/<repo>/commits/<sha>/status`, solo si `gh` está instalado y autenticado.
-3. Con Claude in Chrome: abrir `https://www.odoo.sh/project/<proyecto>/branches/<staging>` (URL **a confirmar** en la primera ejecución) y leer el estado del último build, su SHA y el comando SSH. Comprobar que el SHA coincide con el push.
+3. **Interfaz de Odoo.sh con Claude in Chrome**: seguir **[reference/odoo-sh-ui.md](reference/odoo-sh-ui.md)**. Resumen:
+   - comprobar en el panel izquierdo que la rama staging está bajo *Staging* y no tocar nada de *Production*;
+   - en la pestaña **HISTORY**, buscar la entrada con el SHA corto del push y leer su estado (`Test: Success/Warning/...`);
+   - el botón **SSH** muestra el comando `ssh <build_id>@<build_domain>` del build actual;
+   - **CONNECT** abre la instancia de staging para pruebas funcionales;
+   - prohibido: Fork, Merge, Submodule, Delete, Allow my IP, Rebuild y las pestañas BACKUPS, UPGRADE, TOOLS y SETTINGS.
+   - La URL de la página de la rama está **[no verificada]**: registrarla como nota la primera vez.
+
+## 1.1 Esperar a que termine el build
+
+El build tarda según el tamaño de la base de datos (puede ser bastante en clientes grandes) y **durante el build el SSH no está disponible**.
+
+1. Tras el push: `run-state.js state REMOTE_BUILD`. Mientras la ejecución esté en ese estado, el hook **espacia las llamadas a Claude in Chrome** (mínimo `build_poll_seconds`, 60 s por defecto): no hace falta esperar a mano ni conviene encadenar llamadas.
+2. Comprobar el estado en la pestaña **HISTORY** leyendo el **texto** de la página (no capturas repetidas): estados observados `Build queued`, en curso, `Test: Success`, `Test: Warning` (ver [reference/odoo-sh-ui.md](reference/odoo-sh-ui.md)).
+3. **No usar SSH** mientras el build esté encolado o en curso.
+4. En cada comprobación, `run-state.js build-wait`: indica los minutos de espera y, si se supera `build_timeout_minutes` (60 por defecto), pasa la ejecución a BLOCKED; entonces avisar al usuario sin seguir esperando.
+5. Cuando el build termine: registrar `remote_build` y pasar a `run-state.js state REMOTE_TESTING` (el espaciado de llamadas se desactiva).
 
 ## 2. Estado y logs
 

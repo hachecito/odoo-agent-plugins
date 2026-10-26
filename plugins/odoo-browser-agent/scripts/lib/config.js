@@ -12,6 +12,9 @@ const DEFAULTS = {
   odoo_version: null,
   ssh: { enabled: false, key: null },
   allowed_domains: ['odoo.sh', 'odoo.com', 'github.com'],
+  // Odoo.sh build waiting: minimum seconds between browser checks and maximum wait.
+  build_poll_seconds: 60,
+  build_timeout_minutes: 60,
 };
 
 /**

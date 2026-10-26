@@ -2,8 +2,9 @@
 'use strict';
 // PreToolUse hook: deterministic safety policy for odoo-browser-agent.
 const { execFileSync } = require('child_process');
-const { evaluate, ASK } = require('./lib/policy');
+const { evaluate, ASK, DENY, CHROME_TOOL } = require('./lib/policy');
 const { loadConfig } = require('./lib/config');
+const { throttleBrowser } = require('./lib/throttle');
 
 /**
  * Return the current branch of a git working tree.
@@ -41,7 +42,7 @@ function main() {
   let data = '';
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', (c) => { data += c; });
-  process.stdin.on('end', () => {
+  process.stdin.on('end', async () => {
     let event;
     try {
       event = JSON.parse(data || '{}');
@@ -50,6 +51,11 @@ function main() {
     }
     try {
       const result = evaluate(event, { loadConfig, branchOf });
+      // While waiting for an Odoo.sh build, space out allowed browser calls instead of letting the agent poll.
+      if (CHROME_TOOL.test(event.tool_name || '') && !(result && result.decision === DENY)) {
+        const loaded = loadConfig(event.cwd || process.cwd());
+        if (loaded) await throttleBrowser(loaded, (ms) => new Promise((r) => setTimeout(r, ms)));
+      }
       if (result) emit(result);
     } catch (err) {
       // Fail closed to "ask" instead of silently allowing when the policy crashes.

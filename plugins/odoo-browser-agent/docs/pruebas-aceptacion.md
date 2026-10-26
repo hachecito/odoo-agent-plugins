@@ -21,6 +21,7 @@ Los commits que haga el agente quedan en el historial de esa rama del repositori
    .claude/odoo-agent.json
    .claude/odoo-agent-run.json
    .claude/odoo-agent-notes.json
+   .claude/odoo-agent-throttle.json
    ```
 4. Iniciar sesión en GitHub y Odoo.sh en Chrome.
 5. Abrir Claude Code en el repo, en modo de permisos normal (no auto) para la primera ronda:

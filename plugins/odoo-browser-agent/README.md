@@ -57,11 +57,13 @@ Desarrollo local sin instalar, desde la raíz del repositorio: `claude --plugin-
   "production_branches": ["main"],
   "odoo_version": "18.0",
   "ssh": { "enabled": true, "key": null },
-  "allowed_domains": ["odoo.sh", "odoo.com", "github.com"]
+  "allowed_domains": ["odoo.sh", "odoo.com", "github.com"],
+  "build_poll_seconds": 60,
+  "build_timeout_minutes": 60
 }
 ```
 
-Excluir los archivos del agente sin tocar el `.gitignore` del cliente, añadiéndolos a `.git/info/exclude`: `.claude/odoo-agent.json`, `.claude/odoo-agent-run.json`, `.claude/odoo-agent-notes.json`.
+Excluir los archivos del agente sin tocar el `.gitignore` del cliente, añadiéndolos a `.git/info/exclude`: `.claude/odoo-agent.json`, `.claude/odoo-agent-run.json`, `.claude/odoo-agent-notes.json`, `.claude/odoo-agent-throttle.json`.
 
 ### Aprendizaje por proyecto (`.claude/odoo-agent-notes.json`)
 
