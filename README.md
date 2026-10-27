@@ -22,18 +22,6 @@ claude plugin marketplace update odoo-agent-plugins
 claude plugin update odoosh-browser@odoo-agent-plugins     # comprobar claude plugin list --> nueva versión
 ```
 
-### Cambio de nombre: `odoo-browser-agent` → `odoosh-browser` (v0.4.0)
-
-Un plugin renombrado no llega con `plugin update`: hay que desinstalar el antiguo e instalar el nuevo, en este orden, y reiniciar Claude Code:
-
-```powershell
-claude plugin uninstall odoo-browser-agent@odoo-agent-plugins
-claude plugin marketplace update odoo-agent-plugins
-claude plugin install odoosh-browser@odoo-agent-plugins
-```
-
-Los comandos pasan a ser `/odoosh-browser:odoo-task`, `/odoosh-browser:odoo-project-setup`, etc. En cada repo de cliente ya configurado, ejecutar una vez `config.js migrate` (ver el README del plugin).
-
 ## Estructura
 
 ```

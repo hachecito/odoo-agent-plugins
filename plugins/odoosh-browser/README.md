@@ -65,14 +65,6 @@ Desarrollo local sin instalar, desde la raíz del repositorio: `claude --plugin-
 
 Excluir los archivos del agente sin tocar el `.gitignore` del cliente, añadiéndolos a `.git/info/exclude`: `.claude/odoosh-browser.json`, `.claude/odoosh-browser-run.json`, `.claude/odoosh-browser-notes.json`, `.claude/odoosh-browser-throttle.json`.
 
-### Migración desde odoo-browser-agent (v0.3 o anterior)
-
-El plugin se llamaba `odoo-browser-agent` y sus archivos `.claude/odoo-agent*.json`. Los nombres antiguos se siguen leyendo (el hook sigue protegiendo esos repos), pero conviene migrarlos una vez por repo:
-
-```powershell
-node <plugin>scriptsconfig.js migrate   # renombra a .claude/odoosh-browser*.json y los añade a .git/info/exclude
-```
-
 ### Aprendizaje por proyecto (`.claude/odoosh-browser-notes.json`)
 
 Al terminar cada tarea, el agente guarda entre 0 y 5 notas con lo que comprobó y le servirá la próxima vez (comandos que funcionaron, rutas, host SSH, módulos con tests lentos, errores recurrentes). Al empezar la siguiente tarea, las lee.
