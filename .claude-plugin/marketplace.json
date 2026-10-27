@@ -4,8 +4,8 @@
   "description": "Herramientas de Claude Code para desarrollo Odoo y Odoo.sh.",
   "plugins": [
     {
-      "name": "odoo-browser-agent",
-      "source": "./plugins/odoo-browser-agent",
+      "name": "odoosh-browser",
+      "source": "./plugins/odoosh-browser",
       "description": "Agente para tareas Odoo end-to-end sobre ramas staging de Odoo.sh."
     }
   ]

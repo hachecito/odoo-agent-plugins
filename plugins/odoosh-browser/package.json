@@ -1,0 +1,10 @@
+{
+  "name": "odoosh-browser",
+  "version": "0.4.0",
+  "private": true,
+  "description": "Claude Code plugin scripts (no runtime dependencies).",
+  "scripts": {
+    "test": "node --test tests/policy.test.js tests/scripts.test.js"
+  },
+  "engines": { "node": ">=18" }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "odoosh-browser",
+  "version": "0.4.0",
+  "description": "Completa tareas de Odoo de principio a fin: código, tests, commit, push a una rama staging de Odoo.sh y verificación de build, logs y tests, con salvaguardas deterministas.",
+  "author": { "name": "Octupus Technologies" },
+  "license": "MIT",
+  "keywords": ["odoo", "odoo.sh", "staging", "testing", "automation"]
+}
