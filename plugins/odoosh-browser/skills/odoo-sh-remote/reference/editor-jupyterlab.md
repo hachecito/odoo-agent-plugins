@@ -45,7 +45,7 @@ JupyterLab abre archivos y carpetas por URL con `/lab/tree/<ruta>`; en Odoo.sh e
 
 Rutas `logs` y `src/user` confirmadas por el usuario; el patrón `/lab/tree/<ruta>` es de la documentación de JupyterLab.
 
-**[no verificado] Lectura por API**: Jupyter Server expone `GET /api/contents/<ruta>?content=1&format=text`, que devuelve JSON con el campo `content`. En Odoo.sh sería `https://<build>/odoo-sh/editor/api/contents/logs/odoo.log?content=1&format=text`. Si funciona, es la forma más fiable de leer archivos con el navegador. Solo `GET`: está prohibido escribir por API.
+**[no verificado] Lectura por API**: Jupyter Server expone `GET /api/contents/<ruta>?content=1&format=text`, que devuelve JSON con el campo `content`. En Odoo.sh sería `https://<build>/odoo-sh/editor/api/contents/logs/odoo.log?content=1&format=text`. Devuelve el archivo **entero**: usarla solo para archivos pequeños (por ejemplo una salida ya filtrada en `~/agent-out.txt`), **nunca para logs**. Solo `GET`: está prohibido escribir por API.
 
 ## 4. Interfaz
 
@@ -58,12 +58,13 @@ Rutas `logs` y `src/user` confirmadas por el usuario; el patrón `/lab/tree/<rut
 ## 5. Procedimientos para el agente
 
 ### Leer logs
-Preferir comandos en un terminal antes que abrir `odoo.log` completo en el editor (puede ser enorme):
+Seguir las **reglas de lectura de logs** de `SKILL.md` §2: **nunca** abrir un log completo en el editor ni leerlo por la API; usar el terminal con filtro y límite. Primero listar la carpeta (`odoo.log` es solo el del día actual):
 ```bash
-tail -n 300 ~/logs/odoo.log
-grep -nE "ERROR|CRITICAL|Traceback" ~/logs/odoo.log | tail -n 50
+ls -lh --time-style=long-iso ~/logs/
+grep -nE "ERROR|CRITICAL|Traceback" ~/logs/<archivo> | tail -n 50
 tail -n 200 ~/logs/update.log
 ```
+La carpeta `https://<build>/odoo-sh/editor/lab/tree/logs` sirve para **ver** qué archivos hay; no abrirlos con doble clic.
 
 ### Leer la salida de un terminal (verificado en prueba real)
 El terminal web es **xterm.js dibujado en canvas**: leer el texto de la página no devuelve nada útil. Solo funciona la **captura de pantalla**, y el scroll del terminal no es fiable desde la herramienta. Por eso:

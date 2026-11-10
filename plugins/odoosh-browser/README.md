@@ -112,7 +112,7 @@ npm test
 
 ## Estado
 
-v0.4.0. Comprobado en la primera prueba real: el MCP de GitHub **no** tiene herramienta para leer commit statuses ni check runs, y `gh` no estaba instalado; el build se verificó por SSH y por la página de Odoo.sh.
+v0.5.0. Comprobado en la primera prueba real: el MCP de GitHub **no** tiene herramienta para leer commit statuses ni check runs, y `gh` no estaba instalado; el build se verificó por SSH y por la página de Odoo.sh.
 
 Pendiente de validar en un proyecto Odoo.sh real:
 - nombres exactos de las herramientas de Claude in Chrome;

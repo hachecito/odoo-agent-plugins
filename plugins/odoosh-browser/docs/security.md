@@ -32,6 +32,7 @@ Política durante una tarea:
 - `git -c push.*` y `git config push.*|remote.*|branch.*` → confirmación.
 - **Claude in Chrome** (mejor esfuerzo): hosts `*.odoo.com` que no sean `*.dev.odoo.com` ni `www.odoo.com` → denegado (se tratan como instancias de producción; supuesto no verificado en la documentación de Odoo.sh, ampliable con `ssh.production_hosts`); URLs fuera de `allowed_domains` → confirmación; texto con comandos prohibidos → denegado; ejecución de JavaScript → confirmación.
 - **Espera de builds**: con la ejecución en `REMOTE_BUILD`, el hook retiene cada llamada a Claude in Chrome hasta que pasen `build_poll_seconds` (60 s por defecto) desde la anterior, para no consultar Odoo.sh en bucle. `run-state.js build-wait` bloquea la ejecución al superar `build_timeout_minutes`.
+- **Otros MCP de navegador** (`chrome-devtools`, Playwright, Puppeteer, browser-use, Browserbase): denegados durante una tarea. Abren un navegador sin la sesión del usuario y no pasan por las reglas de Chrome; si Claude in Chrome no está disponible, el agente debe pedir `/chrome`.
 - Si el guard falla internamente, responde "confirmación" en lugar de permitir.
 
 ## Límites conocidos (no se prometen como controles técnicos)

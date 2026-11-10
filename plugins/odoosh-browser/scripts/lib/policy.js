@@ -11,6 +11,8 @@ const GITHUB_WRITE_TOOLS = new Set([
 ]);
 const REMOTE_EXEC_TOOLS = /^mcp__composio__COMPOSIO_(REMOTE_BASH_TOOL|REMOTE_WORKBENCH|MULTI_EXECUTE_TOOL)$/;
 const CHROME_TOOL = /^mcp__(plugin_[^_]+_)?claude-in-chrome__/;
+// Other browser MCPs open a browser without the user's session and skip the Chrome rules.
+const OTHER_BROWSER_TOOL = /^mcp__.*(chrome[-_]devtools|playwright|puppeteer|browsermcp|browser[-_]use|browserbase)/i;
 const SHELL_TOOLS = new Set(['Bash', 'PowerShell']);
 const FILE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 // Guard config and learned notes may only change through their scripts or with user confirmation.
@@ -456,6 +458,9 @@ function evaluate(event, deps) {
     return { decision: DENY, reason: 'Ejecución remota vía Composio bloqueada durante tareas Odoo.' };
   }
   if (CHROME_TOOL.test(name)) return evaluateChrome(name, input, ctx);
+  if (OTHER_BROWSER_TOOL.test(name)) {
+    return { decision: DENY, reason: 'Durante una tarea del plugin el navegador es solo Claude in Chrome. Si no está disponible, pedir al usuario que ejecute /chrome o arranque con claude --chrome; no usar otro MCP de navegador.' };
+  }
   return null;
 }
 

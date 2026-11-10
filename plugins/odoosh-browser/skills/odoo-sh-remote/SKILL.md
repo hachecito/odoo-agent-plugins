@@ -14,6 +14,12 @@ description: Procedimientos para verificar una rama staging en Odoo.sh - localiz
 
 Ante cualquier duda sobre comandos, ORM o tests de la versión del proyecto, consultar **context7** (documentación de Odoo) antes de suponer. Si no lo cubre, revisar el código fuente de Odoo de esa versión y marcar como "no verificado" lo que no se haya comprobado.
 
+## Navegador: solo Claude in Chrome
+
+- Todo lo que pase por el navegador (Odoo.sh, editor, instancia staging) se hace con **Claude in Chrome** (`mcp__claude-in-chrome__*`), que usa la sesión ya iniciada del usuario.
+- **Nunca** usar otro MCP de navegador (`chrome-devtools`, Playwright, Puppeteer…): abren un navegador sin sesión y se saltan las reglas del hook. Durante una tarea, el hook los deniega.
+- Si las herramientas de Claude in Chrome no están disponibles o la extensión no responde: detenerse y pedir al usuario que ejecute `/chrome` o reinicie con `claude --chrome`. Mientras tanto se puede seguir solo por SSH.
+
 ## Seguridad
 
 - Solo hosts `*.dev.odoo.com` (builds de desarrollo/staging). Nunca producción; el hook lo bloquea.
@@ -25,7 +31,7 @@ Ante cualquier duda sobre comandos, ORM o tests de la versión del proyecto, con
 ## 1. Localizar el build
 
 El MCP de GitHub configurado **no expone** el commit status ni los check runs (comprobado en la primera prueba real). Orden de preferencia:
-1. **SSH** (si `ssh.enabled`): conectarse al build de la rama staging y comprobar que el commit desplegado coincide con el push: `ssh <build>@<host> "git -C ~/src/user rev-parse HEAD"`, y revisar `~/logs/update.log` / `odoo.log`. El host sale de las notas del proyecto; si no está o no responde, leerlo en Odoo.sh (botón **SSH** de la rama, paso 3) y actualizar la nota.
+1. **SSH** (si `ssh.enabled`): conectarse al build de la rama staging y comprobar que el commit desplegado coincide con el push: `ssh <build>@<host> "git -C ~/src/user rev-parse HEAD"`, y revisar `update.log` / `odoo.log` siguiendo las reglas de lectura de logs (§2). El host sale de las notas del proyecto; si no está o no responde, leerlo en Odoo.sh (botón **SSH** de la rama, paso 3) y actualizar la nota.
 2. `gh api repos/<owner>/<repo>/commits/<sha>/status`, solo si `gh` está instalado y autenticado.
 3. **Interfaz de Odoo.sh con Claude in Chrome**: seguir **[reference/odoo-sh-ui.md](reference/odoo-sh-ui.md)**. Resumen:
    - comprobar en el panel izquierdo que la rama staging está bajo *Staging* y no tocar nada de *Production*;
@@ -47,8 +53,25 @@ El build tarda según el tamaño de la base de datos (puede ser bastante en clie
 
 ## 2. Estado y logs
 
-- Por SSH (si `ssh.enabled`):
-  `ssh <build>@<host> "tail -n 300 ~/logs/odoo.log"` y `"grep -nE 'ERROR|CRITICAL|Traceback' ~/logs/odoo.log | tail -n 50"`; también `update.log` / `install.log`.
+### Reglas de lectura de logs (obligatorias)
+
+1. **Nunca cargar un log completo** (ni con `cat`, ni abriéndolo en el editor, ni por la API de Jupyter): pueden tener cientos de MB. Leer siempre con filtro y límite de líneas: `grep` / `zgrep` + `tail -n` / `head -n`, o `sed -n 'A,Bp'` para un rango concreto.
+2. **Primero listar la carpeta** y elegir el archivo; no suponer que `odoo.log` es el correcto:
+   ```bash
+   ls -lh --time-style=long-iso ~/logs/
+   ```
+   `odoo.log` es el log **actual**. Si el usuario pide otra fecha u otro periodo, buscar entre los archivos rotados el que cubre esa fecha. El nombre de los archivos rotados (sufijo de fecha, numeración, `.gz`) **no está verificado**: deducirlo del listado, comprobar el rango de cada candidato con su primera y última línea (`head -n 1` / `tail -n 1`; `zcat <f> | head -n 1` si está comprimido) y registrar el patrón como nota (`notes.js add --section odoo-sh`).
+3. Acotar por fecha y tipo de error dentro del archivo elegido:
+   ```bash
+   grep -n '^2026-11-05' ~/logs/<archivo> | grep -E 'ERROR|CRITICAL|Traceback' | tail -n 50
+   zgrep -n -E 'ERROR|CRITICAL' ~/logs/<archivo>.gz | tail -n 50      # si está comprimido
+   grep -n -A 25 'Traceback' ~/logs/<archivo> | head -n 120            # contexto de un error
+   ```
+4. Si el usuario pide una fecha y no hay ningún archivo que la cubra, decirlo; no sustituirla por el log actual.
+
+### Por canal
+
+- Por SSH (si `ssh.enabled`): los mismos comandos dentro de `ssh <build>@<host> "<comando>"`, por ejemplo `ssh <build>@<host> "ls -lh --time-style=long-iso ~/logs/"` y `ssh <build>@<host> "grep -nE 'ERROR|CRITICAL|Traceback' ~/logs/odoo.log | tail -n 50"`. Igual para `update.log` / `install.log`.
 - Por el editor web (Claude in Chrome): **leer antes [reference/editor-jupyterlab.md](reference/editor-jupyterlab.md)** (estructura de carpetas, URLs directas, terminal, cómo leer la salida y qué está prohibido). Resumen: logs en `https://<build_domain>/odoo-sh/editor/lab/tree/logs`, código en `.../lab/tree/src/user`, terminal en *File → New → Terminal*. Nunca editar ni guardar archivos en el editor.
 - Registrar: `run-state.js evidence --kind remote_build --status pass|fail --detail "<build/estado>" --source "<commit status|odoo.sh>"` y `--kind logs_reviewed`.
 - Solo cuentan los errores relacionados con el cambio; anotar aparte los preexistentes.

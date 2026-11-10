@@ -186,3 +186,11 @@ test('Claude in Chrome: domains and terminal text', () => {
   assert.strictEqual(decide('mcp__claude-in-chrome__computer', { action: 'type', text: 'odoosh-push' }), 'deny');
   assert.strictEqual(decide('mcp__claude-in-chrome__javascript_tool', { code: '1+1' }), 'ask');
 });
+
+test('other browser MCPs are denied during a task, free outside', () => {
+  for (const t of ['mcp__chrome-devtools__navigate_page', 'mcp__chrome-devtools__take_snapshot', 'mcp__playwright__browser_navigate', 'mcp__puppeteer__puppeteer_navigate']) {
+    assert.strictEqual(decide(t, { url: 'https://www.odoo.sh' }), 'deny', t);
+    assert.strictEqual(decide(t, { url: 'https://www.odoo.sh' }, { active: false }), null, t);
+  }
+  assert.strictEqual(decide('mcp__claude-in-chrome__navigate', { url: 'https://www.odoo.sh/project/x' }), null);
+});
