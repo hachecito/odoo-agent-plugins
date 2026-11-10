@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 'use strict';
-// CLI to create, show, validate and migrate .claude/odoosh-browser.json in an Odoo module repo.
+// CLI to create, show, validate and migrate .oap/odoosh-browser/config.json in an Odoo module repo.
 const path = require('path');
-const { CONFIG_REL, DEFAULTS, loadConfig, validateConfig, saveConfig, migrateLegacy } = require('./lib/config');
+const { CONFIG_REL, DEFAULTS, loadConfig, validateConfig, saveConfig, migrateLegacy, ensureExcluded } = require('./lib/config');
 
 /**
  * Parse --key value pairs from argv.
@@ -43,6 +43,8 @@ function main() {
     const target = path.join(dir, CONFIG_REL);
     saveConfig(target, config);
     console.log(`Creado: ${target}`);
+    const ex = ensureExcluded(dir);
+    if (ex.excluded.length) console.log(`Añadido a ${ex.excludeFile}: ${ex.excluded.join(', ')}`);
     printProblems(validateConfig(config));
     return;
   }
@@ -55,15 +57,16 @@ function main() {
   } else if (cmd === 'validate') {
     const problems = validateConfig(loaded.config);
     printProblems(problems);
-    if (loaded.legacy) console.log('Aviso: archivos con nombres antiguos (.claude/odoo-agent*.json). Ejecutar "config.js migrate".');
+    if (loaded.legacy) console.log('Aviso: archivos en ubicación antigua (.claude/). Ejecutar "config.js migrate" para pasarlos a .oap/.');
     process.exit(problems.length ? 1 : 0);
   } else if (cmd === 'migrate') {
     const res = migrateLegacy(loaded.root);
-    res.renamed.forEach((r) => console.log(`Renombrado: ${r}`));
-    res.skipped.forEach((r) => console.log(`Sin cambios (ya existe el nuevo): ${r}`));
-    if (res.excludeFile) console.log(res.excluded.length ? `Añadido a ${res.excludeFile}: ${res.excluded.join(', ')}` : '.git/info/exclude ya incluía los nuevos nombres.');
-    else console.log('No se encontró .git/info/exclude: excluir a mano .claude/odoosh-browser*.json del control de versiones.');
-    if (!res.renamed.length && !res.skipped.length) console.log('No había archivos antiguos que migrar.');
+    res.moved.forEach((r) => console.log(`Movido: ${r}`));
+    res.skipped.forEach((r) => console.log(`Sin cambios (ya existe el destino): ${r}`));
+    if (res.notes) console.log(`Notas convertidas a .oap/memory.md: ${res.notes}`);
+    if (res.excludeFile) console.log(res.excluded.length ? `Añadido a ${res.excludeFile}: ${res.excluded.join(', ')}` : '.git/info/exclude ya incluía .oap/.');
+    else console.log('No se encontró .git/info/exclude: excluir a mano .oap/ del control de versiones.');
+    if (!res.moved.length && !res.skipped.length && !res.notes) console.log('No había archivos antiguos que migrar.');
   } else if (cmd === 'set-staging') {
     const branch = rest[0];
     if (!branch || branch.startsWith('--')) {

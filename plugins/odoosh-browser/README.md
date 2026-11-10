@@ -44,11 +44,11 @@ Desarrollo local sin instalar, desde la raíz del repositorio: `claude --plugin-
 ## Uso
 
 1. En el repo de módulos conectado a Odoo.sh, preparar una rama staging para el agente.
-2. `/odoosh-browser:odoo-project-setup`: crea `.claude/odoosh-browser.json` con la rama staging y las ramas de producción, y comprueba Chrome, GitHub y SSH.
+2. `/odoosh-browser:odoo-project-setup`: crea `.oap/odoosh-browser/config.json` con la rama staging y las ramas de producción, y comprueba Chrome, GitHub y SSH.
 3. `/odoosh-browser:odoo-task Corregir el cálculo de X en sale_custom y añadir test`.
 4. El agente pide confirmación antes de cada push y entrega un informe con el resultado: **COMPLETADA**, **PARCIALMENTE VERIFICADA**, **FALLIDA** o **BLOQUEADA**.
 
-### Configuración por repo (`.claude/odoosh-browser.json`)
+### Configuración por repo (`.oap/odoosh-browser/config.json`)
 
 ```json
 {
@@ -63,15 +63,27 @@ Desarrollo local sin instalar, desde la raíz del repositorio: `claude --plugin-
 }
 ```
 
-Excluir los archivos del agente sin tocar el `.gitignore` del cliente, añadiéndolos a `.git/info/exclude`: `.claude/odoosh-browser.json`, `.claude/odoosh-browser-run.json`, `.claude/odoosh-browser-notes.json`, `.claude/odoosh-browser-throttle.json`.
+Todo el estado del plugin vive en `.oap/` (Odoo Agent Plugins), en la raíz del repo:
 
-### Aprendizaje por proyecto (`.claude/odoosh-browser-notes.json`)
+```
+.oap/
+  memory.md                 memoria breve del proyecto, compartida por todos los plugins
+  odoosh-browser/
+    config.json            rama staging, ramas de producción, SSH
+    run.json               estado y evidencias de la tarea en curso
+    throttle.json          ritmo de consulta al navegador durante el build
+```
 
-Al terminar cada tarea, el agente guarda entre 0 y 5 notas con lo que comprobó y le servirá la próxima vez (comandos que funcionaron, rutas, host SSH, módulos con tests lentos, errores recurrentes). Al empezar la siguiente tarea, las lee.
+`config.js init` añade `.oap/` a `.git/info/exclude` (exclusión local; el `.gitignore` del cliente no se toca). Si el repo viene de una versión anterior (`.claude/odoosh-browser*.json`), `config.js migrate` mueve los archivos, convierte las notas antiguas a `memory.md` y excluye `.oap/`.
 
-- Solo se escriben con `scripts/notes.js`, que **rechaza** reglas, permisos, operaciones git de escritura y posibles secretos. Editar el archivo directamente pide confirmación.
+### Memoria del proyecto (`.oap/memory.md`)
+
+Una línea por hallazgo que **no era como se pensaba** (comandos que fallaron, rutas, host SSH, módulos con tests lentos, rarezas del editor u Odoo.sh). El agente la lee al empezar cada tarea y anota **en el momento** en que descubre algo, no solo al final, así que una tarea cortada o bloqueada también deja sus lecciones.
+
+- Se escribe con `scripts/notes.js add [--tag etiqueta] --text "..."`: una línea, máx. 300 caracteres, máx. 60 notas (se descartan las más antiguas), sin duplicados.
+- `notes.js` **rechaza** texto que amplíe permisos, toque la configuración de ramas, indique saltarse salvaguardas o parezca un secreto. Editar el archivo directamente pide confirmación.
 - Son datos, no instrucciones: nunca cambian las reglas de seguridad.
-- Ver o depurar: `node <plugin>\scripts\notes.js show` y `node <plugin>\scripts\notes.js remove <n>`.
+- Ver o depurar: `node <plugin>\scripts\notes.js show` y `node <plugin>\scripts\notes.js remove <n>`. Es Markdown plano: también se puede leer a mano.
 
 ## Acceso SSH a Odoo.sh
 

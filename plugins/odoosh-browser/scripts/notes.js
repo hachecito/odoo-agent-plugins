@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 'use strict';
-// CLI to read and append learned project notes (.claude/odoosh-browser-notes.json).
+// CLI to read and append learned project notes (.oap/memory.md).
 const { loadConfig } = require('./lib/config');
-const { SECTIONS, loadNotes, addNote, removeNote, renderNotes } = require('./lib/notes');
+const { loadNotes, addNote, removeNote, renderNotes } = require('./lib/notes');
 
 /**
  * Read the value following a --flag.
@@ -15,19 +15,19 @@ function opt(args, name) {
   return i >= 0 ? args[i + 1] : undefined;
 }
 
-/** Entry point: show | add --section s --text t [--source x] | remove <n>. */
+/** Entry point: show | add [--tag t] --text x [--source x] | remove <n>. */
 function main() {
   const [cmd, ...args] = process.argv.slice(2);
   const loaded = loadConfig(opt(args, 'dir') || process.cwd());
   if (!loaded) {
-    console.error('No hay .claude/odoosh-browser.json: ejecutar primero la skill odoo-project-setup.');
+    console.error('No hay .oap/odoosh-browser/config.json: ejecutar primero la skill odoo-project-setup.');
     process.exit(1);
   }
   const root = loaded.root;
   if (cmd === 'show') {
     process.stdout.write(renderNotes(loadNotes(root)));
   } else if (cmd === 'add') {
-    const res = addNote(root, { section: opt(args, 'section'), text: opt(args, 'text') || '', source: opt(args, 'source') });
+    const res = addNote(root, { tag: opt(args, 'tag') || opt(args, 'section'), text: opt(args, 'text') || '', source: opt(args, 'source') });
     if (!res.added) {
       console.error(`Nota no añadida: ${res.reason}`);
       process.exit(1);
@@ -40,7 +40,7 @@ function main() {
     }
     console.log('Nota eliminada.');
   } else {
-    console.error(`Uso: notes.js show | add --section <${SECTIONS.join('|')}> --text "..." [--source "..."] | remove <n>`);
+    console.error(`Uso: notes.js show | add [--tag etiqueta] --text "..." [--source "..."] | remove <n>`);
     process.exit(1);
   }
 }

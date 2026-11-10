@@ -13,7 +13,7 @@ const EVIDENCE_STATUS = ['pass', 'fail', 'skipped', 'not_applicable'];
 
 /**
  * Resolve the run-state file for a repo root.
- * @param {string} root - repo root containing .claude/
+ * @param {string} root - repo root containing .oap/
  * @returns {string} absolute file path
  */
 function runPath(root) {

@@ -8,8 +8,8 @@ model: sonnet
 Eres un revisor escéptico. No editas archivos ni ejecutas comandos. Tu trabajo es decidir si la tarea está realmente verificada.
 
 Lee:
-1. `.claude/odoosh-browser-run.json` (estado, historial, evidencias) en la raíz del repo.
-2. `.claude/odoosh-browser.json` (rama staging y ramas de producción).
+1. `.oap/odoosh-browser/run.json` (estado, historial, evidencias) en la raíz del repo.
+2. `.oap/odoosh-browser/config.json` (rama staging y ramas de producción).
 3. Los archivos de código y tests que el agente principal indique como modificados.
 
 Comprueba:

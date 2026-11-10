@@ -16,13 +16,7 @@ Los commits que haga el agente quedan en el historial de esa rama del repositori
 
 1. En Odoo.sh, confirmar que la rama está en la etapa **Staging**, que nadie la usa y revisar *Behavior upon new commits*. Si su base de datos tiene más de un mes, hacer *Rebuild*.
 2. En el repo local del cliente: `git status` limpio, `git checkout <staging>` y `git pull --ff-only`.
-3. Excluir los archivos del agente **sin tocar el `.gitignore` del cliente**, añadiendo a `.git/info/exclude`:
-   ```
-   .claude/odoosh-browser.json
-   .claude/odoosh-browser-run.json
-   .claude/odoosh-browser-notes.json
-   .claude/odoosh-browser-throttle.json
-   ```
+3. Excluir la carpeta del agente **sin tocar el `.gitignore` del cliente**: `config.js init` / `config.js migrate` añaden `.oap/` a `.git/info/exclude` (comprobarlo).
 4. Iniciar sesión en GitHub y Odoo.sh en Chrome.
 5. Abrir Claude Code en el repo, en modo de permisos normal (no auto) para la primera ronda:
    ```powershell
@@ -92,7 +86,7 @@ Comprobar que:
 
 - Si el commit de prueba no debe quedarse: `git revert <sha>` y `git push origin <staging>` (pide confirmación). Nunca force push (está bloqueado).
 - Si se quiere una base de staging limpia: *Rebuild* manual en Odoo.sh.
-- Borrar `.claude/odoosh-browser-run.json` si no se quiere conservar el historial.
+- Borrar `.oap/odoosh-browser/run.json` si no se quiere conservar el historial.
 
 ## Qué no se prueba aquí
 

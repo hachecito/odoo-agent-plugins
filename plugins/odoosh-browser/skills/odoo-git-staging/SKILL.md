@@ -7,7 +7,7 @@ description: Reglas y procedimiento para trabajar con git sobre la rama staging 
 
 ## Reglas innegociables
 
-- La verificación en Odoo.sh se hace en la `staging_branch` de `.claude/odoosh-browser.json`. Si no está definida, **preguntar al usuario** y configurarla con la skill `odoo-project-setup`. Nunca elegirla por cuenta propia.
+- La verificación en Odoo.sh se hace en la `staging_branch` de `.oap/odoosh-browser/config.json`. Si no está definida, **preguntar al usuario** y configurarla con la skill `odoo-project-setup`. Nunca elegirla por cuenta propia.
 - **Nunca** commit, merge, rebase ni push directo contra una rama de producción. Nunca force push ni borrar ramas durante la tarea.
 - **Pull requests contra producción: permitidos.** Si el usuario quiere llevar el cambio a producción mediante un PR, crear una rama propia (por ejemplo `fix/<tema>`), hacer push de esa rama (el hook pide confirmación) y crear el PR con `mcp__github__create_pull_request`. **No avisar de que esto vaya a bloquearse ni proponer reconfigurar el plugin**: no hace falta. Fusionar el PR lo hace siempre el usuario.
 - El hook `guard.js` aplica estas reglas: si deniega algo, **no intentar rodearlo** (otro comando, otra herramienta, MCP de GitHub, terminal de Odoo.sh, `odoosh-push`). Informar al usuario.

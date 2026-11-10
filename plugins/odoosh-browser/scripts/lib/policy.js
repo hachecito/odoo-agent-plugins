@@ -17,7 +17,7 @@ const SHELL_TOOLS = new Set(['Bash', 'PowerShell']);
 const FILE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 // Guard config and learned notes may only change through their scripts or with user confirmation.
 // Current and legacy (plugin <= 0.3) names are both protected.
-const CONFIG_FILE = /(^|[\\/])\.claude[\\/](odoosh-browser|odoo-agent)(-notes)?\.json$/;
+const CONFIG_FILE = /(^|[\\/])(\.oap[\\/](memory\.md|odoosh-browser[\\/]config\.json)|\.claude[\\/](odoosh-browser|odoo-agent)(-notes)?\.json)$/;
 // Odoo.sh public hosts that are not customer instances.
 const ODOO_PUBLIC_HOSTS = new Set(['odoo.com', 'www.odoo.com']);
 
@@ -182,7 +182,7 @@ function evaluatePush(args, ctx) {
     }
   }
   if (!config.staging_branch) {
-    return { decision: DENY, reason: 'No hay staging_branch configurada en .claude/odoosh-browser.json: preguntar al usuario la rama staging antes de hacer push.' };
+    return { decision: DENY, reason: 'No hay staging_branch configurada en .oap/odoosh-browser/config.json: preguntar al usuario la rama staging antes de hacer push.' };
   }
   const others = targets.filter((t) => t !== config.staging_branch);
   if (others.length) {
@@ -324,7 +324,7 @@ function evaluateSsh(args, ctx) {
 function evaluateConfigWrite(tokens, raw) {
   const isConfigCli = tokens.some((t) => /(^|[\\/])config\.js$/.test(t)) && tokens.some((t) => ['init', 'set-staging', 'set-ssh', 'migrate'].includes(t));
   if (isConfigCli) return { decision: ASK, reason: 'Cambio de la configuración del plugin (rama staging/producción/SSH o migración de archivos): confirmar con el usuario.' };
-  if (/(odoosh-browser|odoo-agent)(-notes)?\.json/.test(raw) && /(>|\bsed\b|\btee\b|Set-Content|Out-File|Add-Content|\bcp\b|\bmv\b|Copy-Item|Move-Item|Remove-Item|\brm\b|\bdel\b)/i.test(raw)) {
+  if (/(\.oap[\\/](memory\.md|odoosh-browser[\\/]config\.json)|(odoosh-browser|odoo-agent)(-notes)?\.json)/.test(raw) && /(>|\bsed\b|\btee\b|Set-Content|Out-File|Add-Content|\bcp\b|\bmv\b|Copy-Item|Move-Item|Remove-Item|\brm\b|\bdel\b)/i.test(raw)) {
     return { decision: ASK, reason: 'Modificación de la configuración o las notas del plugin desde la shell: confirmar.' };
   }
   return null;

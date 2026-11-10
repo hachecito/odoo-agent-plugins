@@ -28,6 +28,7 @@ async function throttleBrowser(loaded, sleep) {
   const last = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')).last_ms : null;
   const waitMs = computeWaitMs(last, Date.now(), loaded.config.build_poll_seconds);
   if (waitMs > 0) await sleep(waitMs);
+  fs.mkdirSync(require('path').dirname(p), { recursive: true });
   fs.writeFileSync(p, JSON.stringify({ last_ms: Date.now() }) + '\n', 'utf8');
   return waitMs;
 }
