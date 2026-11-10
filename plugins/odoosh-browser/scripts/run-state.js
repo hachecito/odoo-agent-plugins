@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// CLI to track the state and evidence of an odoo-task run (.claude/odoosh-browser-run.json).
+// CLI to track the state and evidence of an odoo-task run (.oap/odoosh-browser/run.json).
 const { loadConfig } = require('./lib/config');
 const { STATES, EVIDENCE_STATUS, loadRun, saveRun, verdict } = require('./lib/run');
 
@@ -22,7 +22,7 @@ function main() {
   const [cmd, ...args] = process.argv.slice(2);
   const loaded = loadConfig(opt(args, 'dir') || process.cwd());
   if (!loaded) {
-    console.error('No hay .claude/odoosh-browser.json: ejecutar primero la skill odoo-project-setup.');
+    console.error('No hay .oap/odoosh-browser/config.json: ejecutar primero la skill odoo-project-setup.');
     process.exit(1);
   }
   const root = loaded.root;

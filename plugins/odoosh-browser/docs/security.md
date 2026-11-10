@@ -11,7 +11,7 @@
 
 ## Controles deterministas (`scripts/guard.js`, hook PreToolUse)
 
-Solo se activa en repos con `.claude/odoosh-browser.json`, y con dos modos:
+Solo se activa en repos con `.oap/odoosh-browser/config.json`, y con dos modos:
 
 - **Sin tarea del plugin en curso** (trabajo normal): solo deniega el **push directo a una rama de producción** (incluido force push, `--all`, `--mirror` y push sin refspec estando en producción) y pide confirmación para fusionar PRs con el MCP de GitHub y para editar la configuración del guard. Ramas, PRs, SSH y Chrome quedan libres.
 - **Durante una tarea** (desde `run-state.js init` hasta `COMPLETED`, `FAILED` o `run-state.js close`; una tarea sin actividad en 24 h se considera cerrada): se aplica todo lo siguiente.
@@ -27,8 +27,8 @@ Política durante una tarea:
   - `ssh` a `*.odoo.com` que no sea `*.dev.odoo.com` → denegado; comandos remotos con `odoosh-push`, `git push`, `rm -rf`, SQL de escritura → denegado.
 - **MCP GitHub**: herramientas de escritura (`merge_pull_request`, `push_files`, `create_or_update_file`, `delete_file`, `create_branch`, ...) → denegado.
 - **Composio** (ejecución remota) → denegado.
-- **Edición de `.claude/odoosh-browser.json`** (Write/Edit, `config.js init|set-staging|set-ssh`, redirecciones de shell) → confirmación, para que el agente no cambie por su cuenta la rama staging ni las de producción.
-- **Edición directa de `.claude/odoosh-browser-notes.json`** → confirmación. Las notas se añaden con `notes.js`, que rechaza texto con reglas, permisos, ramas, operaciones git de escritura o aspecto de secreto, para que una instrucción inyectada desde una página o un log no se convierta en "conocimiento" persistente.
+- **Edición de `.oap/odoosh-browser/config.json`** (Write/Edit, `config.js init|set-staging|set-ssh`, redirecciones de shell) → confirmación, para que el agente no cambie por su cuenta la rama staging ni las de producción.
+- **Edición directa de `.oap/memory.md`** → confirmación. Las notas se añaden con `notes.js`, que rechaza texto con reglas, permisos, ramas, operaciones git de escritura o aspecto de secreto, para que una instrucción inyectada desde una página o un log no se convierta en "conocimiento" persistente.
 - `git -c push.*` y `git config push.*|remote.*|branch.*` → confirmación.
 - **Claude in Chrome** (mejor esfuerzo): hosts `*.odoo.com` que no sean `*.dev.odoo.com` ni `www.odoo.com` → denegado (se tratan como instancias de producción; supuesto no verificado en la documentación de Odoo.sh, ampliable con `ssh.production_hosts`); URLs fuera de `allowed_domains` → confirmación; texto con comandos prohibidos → denegado; ejecución de JavaScript → confirmación.
 - **Espera de builds**: con la ejecución en `REMOTE_BUILD`, el hook retiene cada llamada a Claude in Chrome hasta que pasen `build_poll_seconds` (60 s por defecto) desde la anterior, para no consultar Odoo.sh en bucle. `run-state.js build-wait` bloquea la ejecución al superar `build_timeout_minutes`.
@@ -39,7 +39,7 @@ Política durante una tarea:
 
 - La interfaz de Odoo.sh es de solo lectura para el agente por regla de skill; un hook no distingue un clic inocuo de uno peligroso (arrastrar una rama a producción, *Rebuild*, backups).
 - El análisis de comandos es heurístico: comandos ofuscados (variables, alias, scripts generados) pueden escapar. Por eso el push a staging siempre pide confirmación.
-- El estado de ejecución (`.claude/odoosh-browser-run.json`) lo escribe el propio agente; el subagente verificador y el informe ayudan, pero no sustituyen la revisión humana.
+- El estado de ejecución (`.oap/odoosh-browser/run.json`) lo escribe el propio agente; el subagente verificador y el informe ayudan, pero no sustituyen la revisión humana.
 - En modo auto, la confirmación por sitio de la extensión de Chrome puede omitirse: los hooks son el único control determinista.
 - Los permisos no se pueden incluir en un plugin; si se desea una capa más, añadir reglas `deny` en `settings.json` del usuario (por ejemplo `Bash(git push --force:*)`).
 
