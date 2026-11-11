@@ -189,6 +189,8 @@ function evaluatePush(args, ctx) {
     // Feature branches (e.g. for a PR against production) are allowed after confirmation.
     return { decision: ASK, reason: `Push a una rama que no es la staging "${config.staging_branch}" (destino: ${others.join(', ')}): confirmar.` };
   }
+  // Opt-in per project: a plain push to the staging branch is not questioned. Tags still ask; production is denied above.
+  if (!tags && config.autonomy && config.autonomy.push_staging === 'auto') return null;
   return { decision: ASK, reason: `Confirmar push a la rama staging "${config.staging_branch}"${tags ? ' (incluye tags)' : ''}.` };
 }
 
@@ -322,7 +324,7 @@ function evaluateSsh(args, ctx) {
  * @returns {{decision: string, reason: string}|null} decision
  */
 function evaluateConfigWrite(tokens, raw) {
-  const isConfigCli = tokens.some((t) => /(^|[\\/])config\.js$/.test(t)) && tokens.some((t) => ['init', 'set-staging', 'set-ssh', 'migrate'].includes(t));
+  const isConfigCli = tokens.some((t) => /(^|[\\/])config\.js$/.test(t)) && tokens.some((t) => ['init', 'set-staging', 'set-ssh', 'set-autonomy', 'migrate'].includes(t));
   if (isConfigCli) return { decision: ASK, reason: 'Cambio de la configuración del plugin (rama staging/producción/SSH o migración de archivos): confirmar con el usuario.' };
   if (/(\.oap[\\/](memory\.md|odoosh-browser[\\/]config\.json)|(odoosh-browser|odoo-agent)(-notes)?\.json)/.test(raw) && /(>|\bsed\b|\btee\b|Set-Content|Out-File|Add-Content|\bcp\b|\bmv\b|Copy-Item|Move-Item|Remove-Item|\brm\b|\bdel\b)/i.test(raw)) {
     return { decision: ASK, reason: 'Modificación de la configuración o las notas del plugin desde la shell: confirmar.' };

@@ -58,10 +58,13 @@ Desarrollo local sin instalar, desde la raíz del repositorio: `claude --plugin-
   "odoo_version": "18.0",
   "ssh": { "enabled": true, "key": null },
   "allowed_domains": ["odoo.sh", "odoo.com", "github.com"],
+  "autonomy": { "push_staging": "confirm" },
   "build_poll_seconds": 60,
   "build_timeout_minutes": 60
 }
 ```
+
+`autonomy.push_staging` (`confirm` por defecto, `auto`) controla si el push a la rama **staging** pide confirmación. Cambiarlo: `config.js set-autonomy auto|confirm` (pide confirmación). Con `auto`, un `git push origin <staging>` simple no pregunta; los push con tags o a otras ramas siguen preguntando y los de producción, force push, `--all` y similares siguen **denegados** en cualquier modo.
 
 Todo el estado del plugin vive en `.oap/` (Odoo Agent Plugins), en la raíz del repo:
 

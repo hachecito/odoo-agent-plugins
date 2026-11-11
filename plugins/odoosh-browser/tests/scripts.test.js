@@ -153,6 +153,8 @@ test('config validation', () => {
   assert.ok(validateConfig({ ...DEFAULTS }).length > 0);
   assert.deepStrictEqual(validateConfig({ ...DEFAULTS, staging_branch: 'stg' }), []);
   assert.ok(validateConfig({ ...DEFAULTS, staging_branch: 'main' }).length > 0);
+  assert.ok(validateConfig({ ...DEFAULTS, staging_branch: 'stg', autonomy: { push_staging: 'yes' } }).length > 0);
+  assert.strictEqual(DEFAULTS.autonomy.push_staging, 'confirm');
 });
 
 test('legacy .claude files: still loaded and protected, migrate moves them to .oap and excludes it', () => {

@@ -49,6 +49,8 @@ const DEFAULTS = {
   production_branches: ['main', 'master', 'production'],
   odoo_version: null,
   ssh: { enabled: false, key: null },
+  // push_staging: "confirm" asks before every push to the staging branch; "auto" skips that question (staging only).
+  autonomy: { push_staging: 'confirm' },
   allowed_domains: ['odoo.sh', 'odoo.com', 'github.com'],
   // Odoo.sh build waiting: minimum seconds between browser checks and maximum wait.
   build_poll_seconds: 60,
@@ -80,7 +82,7 @@ function loadConfig(startDir) {
   const configPath = findConfigPath(startDir);
   if (!configPath) return null;
   const raw = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  const config = { ...DEFAULTS, ...raw, ssh: { ...DEFAULTS.ssh, ...(raw.ssh || {}) } };
+  const config = { ...DEFAULTS, ...raw, ssh: { ...DEFAULTS.ssh, ...(raw.ssh || {}) }, autonomy: { ...DEFAULTS.autonomy, ...(raw.autonomy || {}) } };
   const legacy = !configPath.endsWith(AGENT_FILES.config);
   const up = legacy ? 2 : 3;
   let root = configPath;
@@ -101,6 +103,9 @@ function validateConfig(config) {
   }
   if (config.staging_branch && (config.production_branches || []).includes(config.staging_branch)) {
     problems.push('staging_branch no puede ser una rama de producción.');
+  }
+  if (!['confirm', 'auto'].includes(config.autonomy && config.autonomy.push_staging)) {
+    problems.push('autonomy.push_staging debe ser "confirm" o "auto".');
   }
   return problems;
 }
