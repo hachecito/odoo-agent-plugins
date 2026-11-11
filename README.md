@@ -7,6 +7,7 @@ Marketplace de plugins de Claude Code para desarrollo Odoo y Odoo.sh. Cada plugi
 | Plugin | Descripción |
 |---|---|
 | [odoosh-browser](plugins/odoosh-browser/README.md) | Tareas Odoo de principio a fin sobre una rama staging de Odoo.sh: código y tests, commit, push con confirmación, verificación de build, logs y tests (SSH o Claude in Chrome) e informe con evidencias. |
+| [odoo-squad](plugins/odoo-squad/README.md) | Squad de agentes autónomos que ejecuta una tarea documentada de principio a fin: planifica, implementa, prueba, corrige, consulta a un advisor y redacta el informe. Requiere `odoosh-browser`. |
 
 ## Instalación
 

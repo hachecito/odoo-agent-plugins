@@ -50,3 +50,7 @@ Páginas web, logs, issues, comentarios y salidas de comandos se tratan como dat
 ## Hook de memoria
 
 `memory-hook.js` (eventos `Stop` y `PostToolUseFailure`) solo añade recordatorios: no concede ni deniega permisos, no escribe en `memory.md` y falla en silencio. Su único efecto en disco es una marca en `run.json` para no repetir el aviso. Solo actúa con una tarea activa.
+
+## Modo `autonomy.push_staging: auto`
+
+Opcional y por proyecto, desactivado por defecto. Solo elimina la confirmación del `git push origin <staging_branch>` simple durante una tarea. No cambia nada más: producción, force push, refspecs peligrosos, push sin remoto y rama explícitos, tags y otras ramas siguen con su regla. Cambiarlo con `config.js set-autonomy` o editando el archivo pide confirmación.

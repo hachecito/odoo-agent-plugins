@@ -37,6 +37,20 @@ test('push to staging asks for confirmation', () => {
   assert.strictEqual(bash('git push origin HEAD:refs/heads/staging-agent'), 'ask');
 });
 
+test('autonomy auto: plain staging push is not questioned, everything else keeps its rule', () => {
+  const auto = { config: { ...CONFIG, autonomy: { push_staging: 'auto' } } };
+  assert.strictEqual(bash('git push origin staging-agent', auto), null);
+  assert.strictEqual(bash('git push -u origin HEAD', auto), null);
+  assert.strictEqual(bash('git push origin staging-agent --tags', auto), 'ask');
+  assert.strictEqual(bash('git push origin feature-x', auto), 'ask');
+  assert.strictEqual(bash('git push origin main', auto), 'deny');
+  assert.strictEqual(bash('git push origin staging-agent:main', auto), 'deny');
+  assert.strictEqual(bash('git push --force origin staging-agent', auto), 'deny');
+  assert.strictEqual(bash('git push', auto), 'deny');
+  assert.strictEqual(bash('git push origin staging-agent', { config: { ...CONFIG, autonomy: { push_staging: 'confirm' } } }), 'ask');
+  assert.strictEqual(bash('node "C:/x/scripts/config.js" set-autonomy auto'), 'ask');
+});
+
 test('outside a plugin task only direct production pushes are blocked', () => {
   const idle = { active: false };
   assert.strictEqual(bash('git push origin main', idle), 'deny');
