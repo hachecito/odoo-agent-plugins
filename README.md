@@ -16,11 +16,52 @@ claude plugin marketplace add hachecito/odoo-agent-plugins      # o la ruta loca
 claude plugin install <plugin>@odoo-agent-plugins
 ```
 
+## Uso básico
+
+Preparar **una vez por repo** de módulos Odoo (pide la rama staging de Odoo.sh y comprueba Chrome, GitHub y SSH):
+
+```
+/odoosh-browser:odoo-project-setup
+```
+
+### odoosh-browser: un agente, una tarea
+
+Cuando quieres supervisar de cerca una tarea concreta:
+
+```
+/odoosh-browser:odoo-task Corregir el cálculo de descuentos en sale_custom y añadir un test
+```
+
+Hace código y tests, commit, push a staging (con confirmación), espera el build, lee logs, ejecuta los tests en Odoo.sh y entrega un informe con evidencias.
+
+### odoo-squad: un equipo de agentes, tarea documentada
+
+Cuando quieres delegar la tarea completa. Se le pasa un `.md` (o una descripción):
+
+```
+/odoo-squad:squad-run tareas/descuentos.md
+/odoo-squad:squad-run "Añadir campo 'referencia cliente' a sale.order y mostrarlo en la vista de lista"
+```
+
+Un planificador, un implementador, un tester, un corrector, un advisor (modelo más potente, solo para decisiones difíciles) y un redactor (borradores de mensajes) trabajan sobre las mismas salvaguardas. Requiere tener instalado `odoosh-browser`.
+
+### Utilidades (PowerShell)
+
+```powershell
+node <plugin>\scripts\notes.js show                       # memoria del proyecto (.oap/memory.md)
+node <plugin>\scripts\config.js validate                  # configuración del repo
+node <plugin>\scripts\config.js set-autonomy auto         # push a staging sin confirmar (producción sigue denegada)
+node <plugin>\scripts\config.js migrate                   # pasar .claude/ antiguo a .oap/
+```
+
+Los dos plugins comparten la carpeta `.oap/` del repo (excluida de git): configuración, estado de la tarea y `memory.md` con lo aprendido.
+
 ## Actualización
 
 ```powershell
 claude plugin marketplace update odoo-agent-plugins
 claude plugin update odoosh-browser@odoo-agent-plugins     # comprobar claude plugin list --> nueva versión
+claude plugin update odoo-squad@odoo-agent-plugins
 ```
 
 ## Estructura
