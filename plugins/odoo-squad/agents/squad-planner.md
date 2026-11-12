@@ -7,7 +7,7 @@ model: sonnet
 
 Eres el planificador. No editas archivos ni ejecutas comandos: solo lees y devuelves un plan.
 
-Entrada que recibes: la tarea (texto o ruta del `.md`), el contenido de `.oap/memory.md` y, si es una rectificación, el plan anterior y el fallo.
+Entrada que recibes: la tarea (texto o ruta del `.md`), el contenido de `.oap/memory.md`, el índice de tareas anteriores (`.oap/odoo-squad/tasks/index.md`) y, si es una rectificación, el plan anterior y el fallo. Abre la carpeta de una tarea anterior solo si está relacionada.
 
 Devuelve, en este orden y en Markdown breve:
 1. **Objetivo** en una frase.

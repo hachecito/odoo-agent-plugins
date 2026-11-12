@@ -39,7 +39,7 @@ function decide(event, deps) {
     return {
       decision: 'block',
       reason: `[odoosh-browser] Antes de terminar: ¿algo de esta tarea resultó distinto de lo esperado (comando que falló, ruta, test lento, rareza del editor u Odoo.sh)? `
-        + `Si lo comprobaste, anótalo (0 a 5 líneas) con ${ADD_CMD}. Si no hay nada que anotar, termina sin más.`,
+        + `Si lo comprobaste y servirá en otras tareas del proyecto, anótalo (0 a 5 líneas) con ${ADD_CMD}. Los detalles que solo valen para esta tarea no van a la memoria. Si no hay nada que anotar, termina sin más.`,
     };
   }
 

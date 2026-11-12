@@ -58,13 +58,23 @@ Desarrollo local sin instalar, desde la raíz del repositorio: `claude --plugin-
   "odoo_version": "18.0",
   "ssh": { "enabled": true, "key": null },
   "allowed_domains": ["odoo.sh", "odoo.com", "github.com"],
-  "autonomy": { "push_staging": "confirm" },
+  "autonomy": { "push_staging": "confirm", "yolo": false },
   "build_poll_seconds": 60,
   "build_timeout_minutes": 60
 }
 ```
 
-`autonomy.push_staging` (`confirm` por defecto, `auto`) controla si el push a la rama **staging** pide confirmación. Cambiarlo: `config.js set-autonomy auto|confirm` (pide confirmación). Con `auto`, un `git push origin <staging>` simple no pregunta; los push con tags o a otras ramas siguen preguntando y los de producción, force push, `--all` y similares siguen **denegados** en cualquier modo.
+`autonomy` tiene tres niveles, que se cambian con `config.js set-autonomy confirm|auto|yolo` (el cambio siempre pide confirmación):
+
+| Nivel | Qué deja de preguntar durante una tarea |
+|---|---|
+| `confirm` (por defecto) | nada: cada push a staging y cada JavaScript en Chrome piden confirmación |
+| `auto` | el `git push origin <staging>` simple |
+| `yolo` | además: push a staging con tags, JavaScript en Chrome en dominios permitidos, las herramientas de Claude in Chrome, los scripts del plugin (`run-state`, `notes`, `report`, `oap.js`, `tasks.js`…, solo desde la carpeta real del plugin) y `ssh` a builds `*.dev.odoo.com` (cualquier comando remoto fuera de la lista denegada, incluidos tests que escriben en la base de staging; en local solo filtros como `grep` o `tail`) |
+
+En **cualquier** nivel siguen preguntando: cambios de configuración, push a otras ramas, navegación a dominios no permitidos, `git remote`/`git config` de push y lo que el guard no sepa analizar. Siguen **denegados**: producción, force push, `--all` y similares, comandos peligrosos en el build y otros MCP de navegador. Las reglas de permisos `deny`/`ask` del `settings.json` del usuario también se respetan siempre (el hook no las puede saltar). Fuera de una tarea, `yolo` no aprueba nada.
+
+Durante una tarea, un **subagente** no puede hacer `git commit` ni `git push` (denegado): solo el hilo principal. Se detecta con el campo `agent_id` que Claude Code añade a los hooks de subagentes.
 
 Todo el estado del plugin vive en `.oap/` (Odoo Agent Plugins), en la raíz del repo:
 
@@ -72,7 +82,7 @@ Todo el estado del plugin vive en `.oap/` (Odoo Agent Plugins), en la raíz del 
 .oap/
   memory.md                 memoria breve del proyecto, compartida por todos los plugins
   odoosh-browser/
-    config.json            rama staging, ramas de producción, SSH
+    config.json            rama staging, ramas de producción, SSH, autonomía
     run.json               estado y evidencias de la tarea en curso
     throttle.json          ritmo de consulta al navegador durante el build
 ```

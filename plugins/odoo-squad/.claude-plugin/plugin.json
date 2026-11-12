@@ -1,6 +1,6 @@
 {
   "name": "odoo-squad",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Squad de agentes autónomos para Odoo: planifica, implementa, prueba, corrige y consulta a un advisor, de principio a fin, sobre las salvaguardas y la memoria de odoosh-browser.",
   "author": { "name": "Octupus Technologies" },
   "license": "MIT",

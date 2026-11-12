@@ -53,6 +53,11 @@ function main() {
       console.error(`Estado inválido. Válidos: ${STATES.join(', ')}`);
       process.exit(1);
     }
+    // The independent verification (odoo-verifier) runs in FINAL_VERIFICATION: it cannot be skipped.
+    if (s === 'COMPLETED' && run.state !== 'FINAL_VERIFICATION') {
+      console.error('Solo se puede marcar COMPLETED desde FINAL_VERIFICATION (tras el verificador).');
+      process.exit(1);
+    }
     if (s === 'COMPLETED' && verdict(run).verdict !== 'COMPLETADA') {
       console.error(`No se puede marcar COMPLETED: ${JSON.stringify(verdict(run))}`);
       process.exit(1);

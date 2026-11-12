@@ -41,16 +41,37 @@ tarea → planner → implementer → tester(local) → commit/push staging → 
 
 ## Autonomía
 
-Por defecto el push a staging pide confirmación. Para saltarla **solo en staging** en un proyecto: `config.js set-autonomy auto` (vía `oap.js config set-autonomy auto`, pide confirmación). Producción sigue denegada siempre. Detalle en la documentación de `odoosh-browser`.
+Por defecto el push a staging y el JavaScript en Chrome piden confirmación, también cuando los lanza un subagente; si nadie responde, la tarea se queda parada. Por proyecto se puede subir el nivel con `oap.js config.js set-autonomy auto|yolo` (pide confirmación):
 
-## Memoria
+- `auto`: el push simple a staging deja de preguntar.
+- `yolo`: además, Chrome (incluido JavaScript en dominios permitidos), los scripts del plugin y `ssh` de lectura a builds de staging.
 
-Comparte `.oap/memory.md` con `odoosh-browser`, y su hook de memoria (recordatorio de anotar hallazgos) actúa también durante `squad-run` porque el estado de la tarea usa el mismo `run.json`. Estado propio en `.oap/odoo-squad/` (`plan.md`, `tasks/`).
+Producción, force push y demás denegaciones siguen igual en cualquier nivel. Detalle en la documentación de `odoosh-browser`.
+
+Los subagentes no pueden hacer commit ni push: el guard lo deniega y solo el orquestador los hace.
+
+## Memoria y tareas
+
+```
+.oap/
+  memory.md                         lecciones reutilizables (compartida con odoosh-browser)
+  odoo-squad/tasks/
+    index.md                        una línea por tarea: id · estado · título
+    20261112-campo-referencia/
+      task.md                       la tarea tal como se entregó
+      plan.md                       plan del planner (y sus rectificaciones)
+      hallazgos.md                  detalles que solo valen para esta tarea
+```
+
+- El planner lee siempre `memory.md` y el índice, y solo abre la carpeta de una tarea anterior si está relacionada.
+- La memoria guarda solo lo que sirve en otras tareas, etiquetado por tema.
+- `scripts/tasks.js` crea las carpetas, mantiene el índice y migra el formato 0.1.0 (`tasks migrate`).
+- El hook de memoria de `odoosh-browser` (recordatorio de anotar hallazgos) actúa también durante `squad-run`.
 
 ## Pendiente (próximas versiones)
 
 - Entorno local: Postgres global (Docker, config en `~/.oap/`, bases desechables con prefijo `oap_`) y código fuente de Odoo para ejecutar tests antes del push.
-- Verificar en una sesión real que los alias de modelo resuelven a la última versión y que el hook `Stop` no duplica avisos con subagentes.
+- Comprobar en una sesión real que el `allow` del modo `yolo` evita las preguntas de los subagentes en segundo plano.
 
 ## Desarrollo
 

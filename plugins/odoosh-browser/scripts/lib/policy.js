@@ -1,9 +1,12 @@
 'use strict';
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { splitCommand, programName } = require('./shell');
 
 const DENY = 'deny';
 const ASK = 'ask';
+const ALLOW = 'allow';
 
 const GITHUB_WRITE_TOOLS = new Set([
   'merge_pull_request', 'push_files', 'create_or_update_file', 'delete_file', 'create_branch',
@@ -18,6 +21,50 @@ const FILE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 // Guard config and learned notes may only change through their scripts or with user confirmation.
 // Current and legacy (plugin <= 0.3) names are both protected.
 const CONFIG_FILE = /(^|[\\/])(\.oap[\\/](memory\.md|odoosh-browser[\\/]config\.json)|\.claude[\\/](odoosh-browser|odoo-agent)(-notes)?\.json)$/;
+const PROTECTED_PATH = /(\.oap[\\/](memory\.md|odoosh-browser[\\/]config\.json)|(odoosh-browser|odoo-agent)(-notes)?\.json)/;
+// Programs that write, copy, move or delete the file named in their arguments.
+const WRITER_PROGRAMS = new Set(['tee', 'cp', 'mv', 'rm', 'del', 'copy', 'move', 'set-content', 'add-content', 'out-file', 'copy-item', 'move-item', 'remove-item', 'new-item', 'sc', 'ac', 'ni']);
+// Yolo mode: these scripts of the Odoo agent plugins run without a prompt, only from a real plugin root (see trustedRoots).
+const YOLO_SCRIPTS = new Set(['run-state.js', 'notes.js', 'report.js', 'ssh-check.js', 'config.js', 'oap.js', 'tasks.js']);
+let trustedRootsCache = null;
+
+/**
+ * Plugin roots whose scripts yolo mode trusts: this plugin, its sibling odoo-squad and their marketplace installs.
+ * A folder that merely has the same name (e.g. written inside the client repo) is not trusted.
+ * @returns {string[]} normalized absolute roots
+ */
+function trustedRoots() {
+  if (trustedRootsCache) return trustedRootsCache;
+  const own = path.resolve(__dirname, '..', '..');
+  const roots = [own, path.resolve(own, '..', 'odoo-squad')];
+  try {
+    const file = path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json');
+    const installed = JSON.parse(fs.readFileSync(file, 'utf8'));
+    for (const [key, entries] of Object.entries(installed.plugins || {})) {
+      if (/^(odoosh-browser|odoo-squad)@/.test(key)) for (const e of entries) if (e.installPath) roots.push(path.resolve(e.installPath));
+    }
+  } catch {
+    // No marketplace install: only the checkout roots are trusted.
+  }
+  trustedRootsCache = roots.map((r) => (process.platform === 'win32' ? r.toLowerCase() : r));
+  return trustedRootsCache;
+}
+
+/**
+ * Tell whether a node script argument is an allowlisted script inside a trusted plugin root.
+ * @param {string} token - script path as written in the command
+ * @param {string} dir - directory the command runs in
+ * @returns {boolean} true if trusted
+ */
+function isTrustedPluginScript(token, dir) {
+  let abs = resolveDir(dir, token);
+  if (!YOLO_SCRIPTS.has(path.basename(abs))) return false;
+  if (process.platform === 'win32') abs = abs.toLowerCase();
+  return trustedRoots().some((root) => path.dirname(abs) === path.join(root, 'scripts'));
+}
+// Read-only filters allowed next to a plugin script or an ssh call in yolo mode.
+const SAFE_FILTERS = new Set(['grep', 'tail', 'head', 'wc', 'sort', 'uniq', 'cut', 'echo', 'select-object', 'select-string']);
+const NULL_DEVICES = new Set(['/dev/null', '$null', 'nul']);
 // Odoo.sh public hosts that are not customer instances.
 const ODOO_PUBLIC_HOSTS = new Set(['odoo.com', 'www.odoo.com']);
 
@@ -40,8 +87,19 @@ function strictest(results) {
   const deny = list.filter((r) => r.decision === DENY);
   if (deny.length) return { decision: DENY, reason: deny.map((r) => r.reason).join(' ') };
   const ask = list.filter((r) => r.decision === ASK);
-  if (ask.length) return { decision: ASK, reason: ask.map((r) => r.reason).join(' ') };
+  // A merged ask can be auto-approved in yolo mode only if every part of it can.
+  if (ask.length) return { decision: ASK, reason: ask.map((r) => r.reason).join(' '), yolo: ask.every((r) => r.yolo) };
   return null;
+}
+
+/**
+ * Build an ask that yolo mode may auto-approve when the project enabled it.
+ * @param {object} config - project config
+ * @param {string} reason - reason shown to the user
+ * @returns {{decision: string, reason: string, yolo: boolean}} decision
+ */
+function yoloAsk(config, reason) {
+  return { decision: ASK, reason, yolo: Boolean(config.autonomy && config.autonomy.yolo === true) };
 }
 
 /**
@@ -190,8 +248,8 @@ function evaluatePush(args, ctx) {
     return { decision: ASK, reason: `Push a una rama que no es la staging "${config.staging_branch}" (destino: ${others.join(', ')}): confirmar.` };
   }
   // Opt-in per project: a plain push to the staging branch is not questioned. Tags still ask; production is denied above.
-  if (!tags && config.autonomy && config.autonomy.push_staging === 'auto') return null;
-  return { decision: ASK, reason: `Confirmar push a la rama staging "${config.staging_branch}"${tags ? ' (incluye tags)' : ''}.` };
+  if (!tags && config.autonomy && config.autonomy.push_staging === 'auto' && !config.autonomy.yolo) return null;
+  return yoloAsk(config, `Confirmar push a la rama staging "${config.staging_branch}"${tags ? ' (incluye tags)' : ''}.`);
 }
 
 /**
@@ -221,6 +279,10 @@ function evaluateGit(tokens, ctx) {
   if (!ctx.runActive(loaded.root)) return sub === 'push' ? evaluatePushIdle(args, local) : null;
   if (pushConfig) return { decision: ASK, reason: 'git -c push.*/remote.* altera el destino de los push: confirmar.' };
 
+  // Squad rule: subagents hand their changes back; only the main thread commits and pushes.
+  if (ctx.subagent && (sub === 'push' || sub === 'commit')) {
+    return { decision: DENY, reason: `git ${sub} desde un subagente bloqueado: solo el hilo principal (orquestador) hace commit y push.` };
+  }
   switch (sub) {
     case 'push':
       return evaluatePush(args, local);
@@ -294,18 +356,26 @@ function evaluateRemoteText(text) {
 }
 
 /**
+ * Find the destination host of an ssh invocation.
+ * @param {string[]} args - ssh arguments
+ * @returns {{host: string|null, i: number}} lowercase host and index of the destination token
+ */
+function sshTarget(args) {
+  const withValue = new Set(['-i', '-p', '-o', '-l', '-F', '-J', '-L', '-R', '-D', '-E', '-b', '-c', '-m', '-O', '-Q', '-S', '-W', '-w', '-e', '-I', '-B']);
+  let i = 0;
+  while (i < args.length && args[i].startsWith('-')) i += withValue.has(args[i]) ? 2 : 1;
+  return { host: args[i] ? args[i].split('@').pop().toLowerCase() : null, i };
+}
+
+/**
  * Evaluate an ssh invocation (tokens after "ssh"). Only applies during an active plugin task.
  * @param {string[]} args - ssh arguments
  * @param {object} ctx - {loadConfig(dir), runActive(root), dir}
  * @returns {{decision: string, reason: string}|null} decision
  */
 function evaluateSsh(args, ctx) {
-  const withValue = new Set(['-i', '-p', '-o', '-l', '-F', '-J', '-L', '-R', '-D', '-E', '-b', '-c', '-m', '-O', '-Q', '-S', '-W', '-w', '-e', '-I', '-B']);
-  let i = 0;
-  while (i < args.length && args[i].startsWith('-')) i += withValue.has(args[i]) ? 2 : 1;
-  const dest = args[i];
-  if (!dest) return null;
-  const host = dest.split('@').pop().toLowerCase();
+  const { host, i } = sshTarget(args);
+  if (!host) return null;
   if (!/\.odoo\.com$/.test(host)) return null;
   const loaded = ctx.loadConfig(ctx.dir);
   if (!loaded || !ctx.runActive(loaded.root)) return null;
@@ -323,13 +393,44 @@ function evaluateSsh(args, ctx) {
  * @param {string} raw - raw segment text
  * @returns {{decision: string, reason: string}|null} decision
  */
-function evaluateConfigWrite(tokens, raw) {
+function evaluateConfigWrite(tokens) {
   const isConfigCli = tokens.some((t) => /(^|[\\/])config\.js$/.test(t)) && tokens.some((t) => ['init', 'set-staging', 'set-ssh', 'set-autonomy', 'migrate'].includes(t));
-  if (isConfigCli) return { decision: ASK, reason: 'Cambio de la configuración del plugin (rama staging/producción/SSH o migración de archivos): confirmar con el usuario.' };
-  if (/(\.oap[\\/](memory\.md|odoosh-browser[\\/]config\.json)|(odoosh-browser|odoo-agent)(-notes)?\.json)/.test(raw) && /(>|\bsed\b|\btee\b|Set-Content|Out-File|Add-Content|\bcp\b|\bmv\b|Copy-Item|Move-Item|Remove-Item|\brm\b|\bdel\b)/i.test(raw)) {
+  if (isConfigCli) return { decision: ASK, reason: 'Cambio de la configuración del plugin (rama staging/producción/SSH, autonomía o migración de archivos): confirmar con el usuario.' };
+  // Only real writes count: a redirection to the file or a writing program naming it (reading it with cat is free).
+  const redirected = (tokens.redirects || []).some((t) => PROTECTED_PATH.test(t));
+  const prog = programName(tokens[0]);
+  const writer = WRITER_PROGRAMS.has(prog) || (prog === 'sed' && tokens.some((t) => /^(-i|--in-place)/.test(t) || /^-[a-zA-Z]*i/.test(t)));
+  const written = writer && tokens.slice(1).some((t) => PROTECTED_PATH.test(t));
+  if (redirected || written) {
     return { decision: ASK, reason: 'Modificación de la configuración o las notas del plugin desde la shell: confirmar.' };
   }
   return null;
+}
+
+/**
+ * Tell whether a shell command only runs the plugins' own scripts, ssh to dev builds and read-only filters.
+ * Used by yolo mode to skip Claude Code's own permission prompt for them.
+ * @param {string} command - command line
+ * @param {string} dir - directory the command runs in
+ * @returns {boolean} true if every segment is one of those
+ */
+function isYoloSafeCommand(command, dir = process.cwd()) {
+  const segments = splitCommand(command);
+  let core = false;
+  for (const tokens of segments) {
+    const prog = programName(tokens[0]);
+    if ((tokens.redirects || []).some((t) => !NULL_DEVICES.has(t.toLowerCase()))) return false;
+    if (prog === 'node' && tokens[1] && isTrustedPluginScript(tokens[1], dir)) { core = true; continue; }
+    if (prog === 'ssh') {
+      const { host } = sshTarget(tokens.slice(1));
+      if (!host || !/\.dev\.odoo\.com$/.test(host)) return false;
+      core = true;
+      continue;
+    }
+    if (['cd', 'set-location'].includes(prog) || SAFE_FILTERS.has(prog)) continue;
+    return false;
+  }
+  return core;
 }
 
 /**
@@ -351,7 +452,7 @@ function evaluateCommand(command, ctx, depth = 0) {
       continue;
     }
     const local = { ...ctx, dir };
-    results.push(evaluateConfigWrite(tokens, tokens.join(' ')));
+    results.push(evaluateConfigWrite(tokens));
     if (prog === 'git') {
       if (rest.includes('push')) ctx.seen.push = true;
       results.push(evaluateGit(rest, local));
@@ -413,7 +514,7 @@ function evaluateChrome(toolName, toolInput, ctx) {
     results.push(evaluateRemoteText(s));
   }
   if (/javascript|evaluate|execute_script/i.test(toolName)) {
-    results.push({ decision: ASK, reason: 'Ejecución de JavaScript en el navegador: confirmar.' });
+    results.push(yoloAsk(ctx.config, 'Ejecución de JavaScript en el navegador: confirmar.'));
   }
   return strictest(results);
 }
@@ -425,6 +526,30 @@ function evaluateChrome(toolName, toolInput, ctx) {
  * @returns {{decision: string, reason: string}|null} decision, null = no opinion
  */
 function evaluate(event, deps) {
+  const result = evaluateRules(event, deps);
+  if (result && result.decision !== ASK) return result;
+  const cwd = event.cwd || process.cwd();
+  const loaded = deps.loadConfig(cwd);
+  const yolo = Boolean(loaded && loaded.config.autonomy && loaded.config.autonomy.yolo === true && deps.runActive(loaded.root));
+  if (!yolo) return result;
+  // Yolo mode (opt-in, active task only): approve asks marked as yolo-safe; config changes, unknown domains,
+  // other branches and anything unparsed keep asking, and deny always wins.
+  if (result) return result.yolo ? { decision: ALLOW, reason: `Modo yolo: ${result.reason}` } : result;
+  const name = event.tool_name || '';
+  if (CHROME_TOOL.test(name)) return { decision: ALLOW, reason: 'Modo yolo: Claude in Chrome en un dominio permitido.' };
+  if (SHELL_TOOLS.has(name) && isYoloSafeCommand(String((event.tool_input || {}).command || ''), cwd)) {
+    return { decision: ALLOW, reason: 'Modo yolo: script del plugin o ssh a un build de desarrollo/staging.' };
+  }
+  return null;
+}
+
+/**
+ * Apply the safety rules to a PreToolUse event (no yolo handling).
+ * @param {object} event - hook input {tool_name, tool_input, cwd, agent_id}
+ * @param {object} deps - {loadConfig(dir), branchOf(dir), runActive(root)}
+ * @returns {{decision: string, reason: string, yolo?: boolean}|null} decision, null = no opinion
+ */
+function evaluateRules(event, deps) {
   const cwd = event.cwd || process.cwd();
   const name = event.tool_name || '';
   const input = event.tool_input || {};
@@ -437,7 +562,8 @@ function evaluate(event, deps) {
   }
   // Shell commands resolve the config per directory (git -C, cd), so they are not gated on cwd.
   if (SHELL_TOOLS.has(name)) {
-    return evaluateCommand(String(input.command || ''), { loadConfig: deps.loadConfig, branchOf: deps.branchOf, runActive: deps.runActive, dir: cwd });
+    // agent_id is only present when the call comes from a subagent (Claude Code hooks reference).
+    return evaluateCommand(String(input.command || ''), { loadConfig: deps.loadConfig, branchOf: deps.branchOf, runActive: deps.runActive, dir: cwd, subagent: Boolean(event.agent_id) });
   }
 
   const loaded = deps.loadConfig(cwd);
@@ -466,4 +592,4 @@ function evaluate(event, deps) {
   return null;
 }
 
-module.exports = { evaluate, evaluateCommand, evaluatePush, evaluateSsh, evaluateRemoteText, evaluateChrome, isProductionHost, CHROME_TOOL, DENY, ASK };
+module.exports = { evaluate, evaluateRules, isYoloSafeCommand, evaluateCommand, evaluatePush, evaluateSsh, evaluateRemoteText, evaluateChrome, isProductionHost, CHROME_TOOL, DENY, ASK, ALLOW };

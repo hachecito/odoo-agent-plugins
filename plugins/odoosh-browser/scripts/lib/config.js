@@ -50,7 +50,8 @@ const DEFAULTS = {
   odoo_version: null,
   ssh: { enabled: false, key: null },
   // push_staging: "confirm" asks before every push to the staging branch; "auto" skips that question (staging only).
-  autonomy: { push_staging: 'confirm' },
+  // yolo: during a task, also approve the plugin scripts, Claude in Chrome (incl. JS) and ssh to dev builds without prompts.
+  autonomy: { push_staging: 'confirm', yolo: false },
   allowed_domains: ['odoo.sh', 'odoo.com', 'github.com'],
   // Odoo.sh build waiting: minimum seconds between browser checks and maximum wait.
   build_poll_seconds: 60,
@@ -107,6 +108,7 @@ function validateConfig(config) {
   if (!['confirm', 'auto'].includes(config.autonomy && config.autonomy.push_staging)) {
     problems.push('autonomy.push_staging debe ser "confirm" o "auto".');
   }
+  if (typeof (config.autonomy && config.autonomy.yolo) !== 'boolean') problems.push('autonomy.yolo debe ser true o false.');
   return problems;
 }
 

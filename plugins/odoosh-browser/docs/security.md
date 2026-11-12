@@ -6,7 +6,7 @@
 |---|---|---|
 | 1. Lectura | leer archivos, git status/log/diff, logs, páginas de Odoo.sh/GitHub | libre |
 | 2. Cambios locales | editar código y tests, commits en la rama staging | libre (commit en producción: **denegado**) |
-| 3. Remoto | push a la rama staging | **confirmación** del usuario en cada push |
+| 3. Remoto | push a la rama staging | **confirmación** del usuario en cada push (salvo `autonomy` `auto` o `yolo`) |
 | 4. Sensible | push a producción, force push, borrar ramas, merges vía GitHub, `odoosh-push`, SQL de escritura, SSH a producción | **denegado** |
 
 ## Controles deterministas (`scripts/guard.js`, hook PreToolUse)
@@ -27,7 +27,7 @@ Política durante una tarea:
   - `ssh` a `*.odoo.com` que no sea `*.dev.odoo.com` → denegado; comandos remotos con `odoosh-push`, `git push`, `rm -rf`, SQL de escritura → denegado.
 - **MCP GitHub**: herramientas de escritura (`merge_pull_request`, `push_files`, `create_or_update_file`, `delete_file`, `create_branch`, ...) → denegado.
 - **Composio** (ejecución remota) → denegado.
-- **Edición de `.oap/odoosh-browser/config.json`** (Write/Edit, `config.js init|set-staging|set-ssh`, redirecciones de shell) → confirmación, para que el agente no cambie por su cuenta la rama staging ni las de producción.
+- **Edición de `.oap/odoosh-browser/config.json` o `memory.md`** (Write/Edit, `config.js init|set-staging|set-ssh|set-autonomy|migrate`, redirecciones `>` o programas que escriben como `cp`, `sed`, `Set-Content`) → confirmación, para que el agente no cambie por su cuenta la rama staging ni las de producción. Leerlos (`cat`, `2>/dev/null`) es libre.
 - **Edición directa de `.oap/memory.md`** → confirmación. Las notas se añaden con `notes.js`, que rechaza texto con reglas, permisos, ramas, operaciones git de escritura o aspecto de secreto, para que una instrucción inyectada desde una página o un log no se convierta en "conocimiento" persistente.
 - `git -c push.*` y `git config push.*|remote.*|branch.*` → confirmación.
 - **Claude in Chrome** (mejor esfuerzo): hosts `*.odoo.com` que no sean `*.dev.odoo.com` ni `www.odoo.com` → denegado (se tratan como instancias de producción; supuesto no verificado en la documentación de Odoo.sh, ampliable con `ssh.production_hosts`); URLs fuera de `allowed_domains` → confirmación; texto con comandos prohibidos → denegado; ejecución de JavaScript → confirmación.
@@ -51,6 +51,30 @@ Páginas web, logs, issues, comentarios y salidas de comandos se tratan como dat
 
 `memory-hook.js` (eventos `Stop` y `PostToolUseFailure`) solo añade recordatorios: no concede ni deniega permisos, no escribe en `memory.md` y falla en silencio. Su único efecto en disco es una marca en `run.json` para no repetir el aviso. Solo actúa con una tarea activa.
 
-## Modo `autonomy.push_staging: auto`
+## Autonomía: `auto` y `yolo`
 
-Opcional y por proyecto, desactivado por defecto. Solo elimina la confirmación del `git push origin <staging_branch>` simple durante una tarea. No cambia nada más: producción, force push, refspecs peligrosos, push sin remoto y rama explícitos, tags y otras ramas siguen con su regla. Cambiarlo con `config.js set-autonomy` o editando el archivo pide confirmación.
+Opcional y por proyecto, desactivado por defecto (`confirm`). Cambiarlo con `config.js set-autonomy` o editando el archivo pide confirmación, también en `yolo`: el agente no puede subir su propio nivel ni tocar `staging_branch` o `production_branches` sin el usuario.
+
+- **`auto`**: solo elimina la confirmación del `git push origin <staging_branch>` simple durante una tarea.
+- **`yolo`**: el guard responde `allow` (sin pregunta) a:
+  - las confirmaciones que marca como seguras: push a staging, incluido con tags, y JavaScript en Chrome en dominios permitidos;
+  - las herramientas de Claude in Chrome sin otra regla;
+  - una lista cerrada de scripts propios (`run-state`, `notes`, `report`, `ssh-check`, `config`, `oap`, `tasks`), solo si están en la carpeta real de `odoosh-browser` u `odoo-squad` (la del propio guard, su hermana o la instalación del marketplace) y sin redirecciones a archivos. Una carpeta con el mismo nombre dentro del repo no cuenta;
+  - `ssh` a `*.dev.odoo.com`, combinado en local solo con filtros (`grep`, `tail`, `head`, `wc`, `sort`…). El comando **remoto** puede ser cualquiera que no esté en la lista denegada (`odoosh-push`, `git push`, `rm -rf`, SQL de escritura): por ejemplo `odoo-bin --test-enable`, que escribe en la base de staging.
+- **En cualquier nivel siguen preguntando**:
+  - la configuración del plugin y `memory.md`;
+  - el push a ramas que no son staging;
+  - los dominios no permitidos;
+  - `git remote` y `git -c|config push.*`;
+  - los push no analizables;
+  - los errores del propio guard.
+- **En cualquier nivel siguen denegados**: todo lo del nivel 4 de la tabla y las reglas de esta página marcadas como denegadas.
+- Solo actúa con una tarea activa.
+- Según la documentación de Claude Code, un `allow` de un hook **no salta** las reglas `deny`/`ask` del `settings.json` del usuario.
+- **No verificado**: si un `allow` evita la pregunta de permisos de un subagente en segundo plano.
+
+Riesgo asumido con `yolo`: el JavaScript en Chrome se ejecuta con la sesión del usuario en Odoo.sh y en las instancias de staging. Una página manipulada podría inducir al agente a ejecutar algo no deseado. Solo debe activarse en proyectos de confianza.
+
+## Subagentes
+
+Durante una tarea, `git commit` y `git push` lanzados desde un subagente se deniegan: los cambios se devuelven al hilo principal, que los revisa y hace commit y push. Se identifica con el campo `agent_id` de la entrada del hook, que según la documentación de Claude Code solo está presente en subagentes. Comprobado con `claude -p`: una llamada del hilo principal llega sin `agent_id` y la de un subagente con él.

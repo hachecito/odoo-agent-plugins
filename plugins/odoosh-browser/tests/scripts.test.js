@@ -155,6 +155,34 @@ test('config validation', () => {
   assert.ok(validateConfig({ ...DEFAULTS, staging_branch: 'main' }).length > 0);
   assert.ok(validateConfig({ ...DEFAULTS, staging_branch: 'stg', autonomy: { push_staging: 'yes' } }).length > 0);
   assert.strictEqual(DEFAULTS.autonomy.push_staging, 'confirm');
+  assert.strictEqual(DEFAULTS.autonomy.yolo, false);
+  assert.ok(validateConfig({ ...DEFAULTS, staging_branch: 'stg', autonomy: { push_staging: 'auto', yolo: 'si' } }).length > 0);
+});
+
+test('notes show --tag filters but keeps global indexes', () => {
+  const { renderNotes } = require('../scripts/lib/notes');
+  const doc = { notes: [{ tag: 'a', text: 'uno' }, { tag: 'b', text: 'dos' }] };
+  const out = renderNotes(doc, 'b');
+  assert.ok(out.includes('[2] (b) dos') && !out.includes('uno'), out);
+});
+
+test('run-state: COMPLETED only from FINAL_VERIFICATION', () => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const { spawnSync } = require('child_process');
+  const cli = path.join(__dirname, '..', 'scripts', 'run-state.js');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'odoosh-browser-'));
+  fs.mkdirSync(path.join(root, '.oap', 'odoosh-browser'), { recursive: true });
+  fs.writeFileSync(path.join(root, '.oap', 'odoosh-browser', 'config.json'), JSON.stringify({ staging_branch: 'stg', production_branches: ['main'] }));
+  const run = (...a) => spawnSync(process.execPath, [cli, ...a, '--dir', root], { encoding: 'utf8' });
+  run('init', '--task', 't');
+  for (const k of REQUIRED_EVIDENCE) run('evidence', '--kind', k, '--status', 'pass', '--detail', 'x');
+  run('state', 'REMOTE_TESTING');
+  assert.notStrictEqual(run('state', 'COMPLETED').status, 0);
+  run('state', 'FINAL_VERIFICATION');
+  assert.strictEqual(run('state', 'COMPLETED').status, 0);
+  fs.rmSync(root, { recursive: true, force: true });
 });
 
 test('legacy .claude files: still loaded and protected, migrate moves them to .oap and excludes it', () => {

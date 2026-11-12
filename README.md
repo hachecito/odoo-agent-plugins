@@ -51,6 +51,7 @@ Un planificador, un implementador, un tester, un corrector, un advisor (modelo m
 node <plugin>\scripts\notes.js show                       # memoria del proyecto (.oap/memory.md)
 node <plugin>\scripts\config.js validate                  # configuración del repo
 node <plugin>\scripts\config.js set-autonomy auto         # push a staging sin confirmar (producción sigue denegada)
+node <plugin>\scripts\config.js set-autonomy yolo         # además Chrome, scripts del plugin y ssh a staging sin confirmar
 node <plugin>\scripts\config.js migrate                   # pasar .claude/ antiguo a .oap/
 ```
 

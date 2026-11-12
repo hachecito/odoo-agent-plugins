@@ -18,6 +18,7 @@ Ante cualquier duda sobre comandos, ORM o tests de la versión del proyecto, con
 
 - Todo lo que pase por el navegador (Odoo.sh, editor, instancia staging) se hace con **Claude in Chrome** (`mcp__claude-in-chrome__*`), que usa la sesión ya iniciada del usuario.
 - **Nunca** usar otro MCP de navegador (`chrome-devtools`, Playwright, Puppeteer…): abren un navegador sin sesión y se saltan las reglas del hook. Durante una tarea, el hook los deniega.
+- Para leer una página usar `get_page_text`, `read_page` o `find` de Claude in Chrome (nombres observados en una sesión real). `javascript_tool` solo como último recurso: pide confirmación salvo en modo `yolo`, y si el usuario no está atento la tarea queda parada.
 - Si las herramientas de Claude in Chrome no están disponibles o la extensión no responde: detenerse y pedir al usuario que ejecute `/chrome` o reinicie con `claude --chrome`. Mientras tanto se puede seguir solo por SSH.
 
 ## Seguridad
