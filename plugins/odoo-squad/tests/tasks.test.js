@@ -4,7 +4,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { slugify, newTask, setStatus, readIndex, migrate } = require('../scripts/tasks');
+const { slugify, newTask, setStatus, readIndex, migrate, findRoot } = require('../scripts/tasks');
 
 /**
  * Create a temp repo with an .oap folder.
@@ -12,7 +12,8 @@ const { slugify, newTask, setStatus, readIndex, migrate } = require('../scripts/
  */
 function tmpRepo() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'odoo-squad-'));
-  fs.mkdirSync(path.join(root, '.oap'));
+  fs.mkdirSync(path.join(root, '.oap', 'odoosh-browser'), { recursive: true });
+  fs.writeFileSync(path.join(root, '.oap', 'odoosh-browser', 'config.json'), '{}');
   return root;
 }
 
@@ -51,5 +52,12 @@ test('migrate: 0.1.0 flat tasks and shared plan.md move into task folders', () =
   assert.strictEqual(fs.readFileSync(path.join(dir, '20260101-uno', 'task.md'), 'utf8'), 'uno');
   assert.deepStrictEqual(readIndex(root).map((e) => e.status), ['migrada', 'migrada']);
   assert.deepStrictEqual(migrate(root), { moved: [], plan: null }); // idempotent
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('findRoot: needs the odoosh-browser config, a bare .oap folder is not a project', () => {
+  const root = tmpRepo();
+  fs.mkdirSync(path.join(root, 'sub', '.oap'), { recursive: true });
+  assert.strictEqual(findRoot(path.join(root, 'sub')), root);
   fs.rmSync(root, { recursive: true, force: true });
 });

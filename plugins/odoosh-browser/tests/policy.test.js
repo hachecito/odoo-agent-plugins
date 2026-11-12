@@ -1,6 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
+const path = require('path');
 const { evaluate } = require('../scripts/lib/policy');
 const { DEFAULTS } = require('../scripts/lib/config');
 
@@ -218,7 +219,12 @@ test('redirections are not refspecs nor writes: 2>&1 push to staging, reading co
   assert.strictEqual(bash('node C:/x/scripts/run-state.js evidence --kind push --status pass --detail "abc -> origin/staging-agent"'), null);
   assert.strictEqual(bash('echo {} > .oap/odoosh-browser/config.json'), 'ask');
   assert.strictEqual(bash('cp other.json .oap/odoosh-browser/config.json'), 'ask');
+  assert.strictEqual(bash('sed -n 1,20p .oap/memory.md'), null);
+  assert.strictEqual(bash('sed -i s/a/b/ .oap/memory.md'), 'ask');
 });
+
+const OWN_SCRIPTS = path.join(__dirname, '..', 'scripts').split(path.sep).join('/');
+const SQUAD_SCRIPTS = path.join(__dirname, '..', '..', 'odoo-squad', 'scripts').split(path.sep).join('/');
 
 /**
  * Run the full policy (yolo included) and return decision.
@@ -243,11 +249,12 @@ test('yolo: approves safe asks and own scripts, keeps config changes, unknown do
   assert.strictEqual(sh('git push origin staging-agent --tags'), 'allow');
   assert.strictEqual(decideYolo('mcp__claude-in-chrome__javascript_tool', js), 'allow');
   assert.strictEqual(decideYolo('mcp__claude-in-chrome__navigate', { url: 'https://www.odoo.sh/project/x' }), 'allow');
-  assert.strictEqual(sh('node "C:/Users/u/.claude/plugins/cache/m/odoosh-browser/0.8.0/scripts/run-state.js" state REMOTE_BUILD'), 'allow');
-  assert.strictEqual(sh('node "C:/u/plugins/odoo-squad/scripts/oap.js" notes.js show 2>&1 | tail -5'), 'allow');
+  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/run-state.js" state REMOTE_BUILD`), 'allow');
+  assert.strictEqual(sh(`node "${SQUAD_SCRIPTS}/oap.js" notes.js show 2>&1 | tail -5`), 'allow');
+  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/notes.js" show --tag tests; node "${SQUAD_SCRIPTS}/tasks.js" list`), 'allow');
   assert.strictEqual(sh('ssh 1@proj-staging-1.dev.odoo.com "grep -n ERROR ~/logs/odoo.log | tail -n 50"'), 'allow');
   // Still asking or denied in yolo
-  assert.strictEqual(sh('node "C:/u/plugins/odoo-squad/scripts/oap.js" config.js set-autonomy confirm'), 'ask');
+  assert.strictEqual(sh(`node "${SQUAD_SCRIPTS}/oap.js" config.js set-autonomy confirm`), 'ask');
   assert.strictEqual(sh('git push origin feature-x'), 'ask');
   assert.strictEqual(sh('git remote set-url origin git@x:y.git'), 'ask');
   assert.strictEqual(decideYolo('mcp__claude-in-chrome__navigate', { url: 'https://evil.example.com' }), 'ask');
@@ -258,11 +265,14 @@ test('yolo: approves safe asks and own scripts, keeps config changes, unknown do
   assert.strictEqual(decideYolo('mcp__claude-in-chrome__navigate', { url: 'https://cliente.odoo.com/odoo' }), 'deny');
   // Not approved: other programs, writes to files, scripts outside the plugins
   assert.strictEqual(sh('node C:/tmp/scripts/run-state.js show'), null);
-  assert.strictEqual(sh('node "C:/u/plugins/odoosh-browser/scripts/report.js" > out.md'), null);
+  assert.strictEqual(sh('node ./odoosh-browser/scripts/run-state.js show'), null); // same-named folder inside the repo
+  assert.strictEqual(sh('node "C:/Users/u/.claude/plugins/cache/m/odoosh-browser/0.8.0/scripts/run-state.js" show'), null); // not an install
+  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/guard.js"`), null); // not in the allowlist
+  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/report.js" > out.md`), null);
   assert.strictEqual(sh('python -c "print(1)"'), null);
   // Without yolo or outside a task, nothing is auto-approved
   assert.strictEqual(decideYolo('mcp__claude-in-chrome__javascript_tool', js, { yolo: false }), 'ask');
-  assert.strictEqual(sh('node "C:/u/plugins/odoosh-browser/scripts/run-state.js" show', { active: false }), null);
+  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/run-state.js" show`, { active: false }), null);
 });
 
 test('subagents cannot commit or push during a task', () => {

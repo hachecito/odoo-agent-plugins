@@ -11,14 +11,15 @@ const LINE_RE = /^- (\S+) · (\S+) · (.*)$/;
 const FINDINGS_HEADER = '# Hallazgos de la tarea\n\nDetalles que solo valen para esta tarea. Lo reutilizable va a .oap/memory.md.\n\n';
 
 /**
- * Find the repo root that holds .oap/, walking up from a directory.
+ * Find the configured repo root (.oap/odoosh-browser/config.json), walking up from a directory.
+ * A bare .oap/ folder (e.g. a future global ~/.oap/) does not count.
  * @param {string} start - starting directory
  * @returns {string|null} root, or null
  */
 function findRoot(start) {
   let dir = path.resolve(start);
   for (;;) {
-    if (fs.existsSync(path.join(dir, '.oap'))) return dir;
+    if (fs.existsSync(path.join(dir, '.oap', 'odoosh-browser', 'config.json'))) return dir;
     const parent = path.dirname(dir);
     if (parent === dir) return null;
     dir = parent;
@@ -150,7 +151,7 @@ function main() {
   const [cmd, ...args] = process.argv.slice(2);
   const root = findRoot(opt(args, 'dir') || process.cwd());
   if (!root) {
-    console.error('No hay carpeta .oap/: ejecutar primero /odoosh-browser:odoo-project-setup.');
+    console.error('No hay .oap/odoosh-browser/config.json: ejecutar primero /odoosh-browser:odoo-project-setup.');
     process.exit(1);
   }
   if (cmd === 'new') {

@@ -70,7 +70,7 @@ Desarrollo local sin instalar, desde la raíz del repositorio: `claude --plugin-
 |---|---|
 | `confirm` (por defecto) | nada: cada push a staging y cada JavaScript en Chrome piden confirmación |
 | `auto` | el `git push origin <staging>` simple |
-| `yolo` | además: push a staging con tags, JavaScript en Chrome en dominios permitidos, las herramientas de Claude in Chrome, los scripts del plugin (`run-state`, `notes`, `report`, `oap.js`, `tasks.js`…) y `ssh` a builds `*.dev.odoo.com` con filtros de solo lectura (`grep`, `tail`…) |
+| `yolo` | además: push a staging con tags, JavaScript en Chrome en dominios permitidos, las herramientas de Claude in Chrome, los scripts del plugin (`run-state`, `notes`, `report`, `oap.js`, `tasks.js`…, solo desde la carpeta real del plugin) y `ssh` a builds `*.dev.odoo.com` (cualquier comando remoto fuera de la lista denegada, incluidos tests que escriben en la base de staging; en local solo filtros como `grep` o `tail`) |
 
 En **cualquier** nivel siguen preguntando: cambios de configuración, push a otras ramas, navegación a dominios no permitidos, `git remote`/`git config` de push y lo que el guard no sepa analizar. Siguen **denegados**: producción, force push, `--all` y similares, comandos peligrosos en el build y otros MCP de navegador. Las reglas de permisos `deny`/`ask` del `settings.json` del usuario también se respetan siempre (el hook no las puede saltar). Fuera de una tarea, `yolo` no aprueba nada.
 

@@ -1,4 +1,6 @@
 'use strict';
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { splitCommand, programName } = require('./shell');
 
@@ -21,9 +23,45 @@ const FILE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 const CONFIG_FILE = /(^|[\\/])(\.oap[\\/](memory\.md|odoosh-browser[\\/]config\.json)|\.claude[\\/](odoosh-browser|odoo-agent)(-notes)?\.json)$/;
 const PROTECTED_PATH = /(\.oap[\\/](memory\.md|odoosh-browser[\\/]config\.json)|(odoosh-browser|odoo-agent)(-notes)?\.json)/;
 // Programs that write, copy, move or delete the file named in their arguments.
-const WRITER_PROGRAMS = new Set(['sed', 'tee', 'cp', 'mv', 'rm', 'del', 'copy', 'move', 'set-content', 'add-content', 'out-file', 'copy-item', 'move-item', 'remove-item', 'new-item', 'sc', 'ac', 'ni']);
-// Yolo mode: own scripts of the Odoo agent plugins (installed cache or repo checkout) run without a prompt.
-const PLUGIN_SCRIPT = /[\\/](odoosh-browser|odoo-squad)[\\/]([^\\/]+[\\/])?scripts[\\/][a-z-]+\.js$/i;
+const WRITER_PROGRAMS = new Set(['tee', 'cp', 'mv', 'rm', 'del', 'copy', 'move', 'set-content', 'add-content', 'out-file', 'copy-item', 'move-item', 'remove-item', 'new-item', 'sc', 'ac', 'ni']);
+// Yolo mode: these scripts of the Odoo agent plugins run without a prompt, only from a real plugin root (see trustedRoots).
+const YOLO_SCRIPTS = new Set(['run-state.js', 'notes.js', 'report.js', 'ssh-check.js', 'config.js', 'oap.js', 'tasks.js']);
+let trustedRootsCache = null;
+
+/**
+ * Plugin roots whose scripts yolo mode trusts: this plugin, its sibling odoo-squad and their marketplace installs.
+ * A folder that merely has the same name (e.g. written inside the client repo) is not trusted.
+ * @returns {string[]} normalized absolute roots
+ */
+function trustedRoots() {
+  if (trustedRootsCache) return trustedRootsCache;
+  const own = path.resolve(__dirname, '..', '..');
+  const roots = [own, path.resolve(own, '..', 'odoo-squad')];
+  try {
+    const file = path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json');
+    const installed = JSON.parse(fs.readFileSync(file, 'utf8'));
+    for (const [key, entries] of Object.entries(installed.plugins || {})) {
+      if (/^(odoosh-browser|odoo-squad)@/.test(key)) for (const e of entries) if (e.installPath) roots.push(path.resolve(e.installPath));
+    }
+  } catch {
+    // No marketplace install: only the checkout roots are trusted.
+  }
+  trustedRootsCache = roots.map((r) => (process.platform === 'win32' ? r.toLowerCase() : r));
+  return trustedRootsCache;
+}
+
+/**
+ * Tell whether a node script argument is an allowlisted script inside a trusted plugin root.
+ * @param {string} token - script path as written in the command
+ * @param {string} dir - directory the command runs in
+ * @returns {boolean} true if trusted
+ */
+function isTrustedPluginScript(token, dir) {
+  let abs = resolveDir(dir, token);
+  if (!YOLO_SCRIPTS.has(path.basename(abs))) return false;
+  if (process.platform === 'win32') abs = abs.toLowerCase();
+  return trustedRoots().some((root) => path.dirname(abs) === path.join(root, 'scripts'));
+}
 // Read-only filters allowed next to a plugin script or an ssh call in yolo mode.
 const SAFE_FILTERS = new Set(['grep', 'tail', 'head', 'wc', 'sort', 'uniq', 'cut', 'echo', 'select-object', 'select-string']);
 const NULL_DEVICES = new Set(['/dev/null', '$null', 'nul']);
@@ -360,7 +398,9 @@ function evaluateConfigWrite(tokens) {
   if (isConfigCli) return { decision: ASK, reason: 'Cambio de la configuración del plugin (rama staging/producción/SSH, autonomía o migración de archivos): confirmar con el usuario.' };
   // Only real writes count: a redirection to the file or a writing program naming it (reading it with cat is free).
   const redirected = (tokens.redirects || []).some((t) => PROTECTED_PATH.test(t));
-  const written = WRITER_PROGRAMS.has(programName(tokens[0])) && tokens.slice(1).some((t) => PROTECTED_PATH.test(t));
+  const prog = programName(tokens[0]);
+  const writer = WRITER_PROGRAMS.has(prog) || (prog === 'sed' && tokens.some((t) => /^(-i|--in-place)/.test(t) || /^-[a-zA-Z]*i/.test(t)));
+  const written = writer && tokens.slice(1).some((t) => PROTECTED_PATH.test(t));
   if (redirected || written) {
     return { decision: ASK, reason: 'Modificación de la configuración o las notas del plugin desde la shell: confirmar.' };
   }
@@ -371,15 +411,16 @@ function evaluateConfigWrite(tokens) {
  * Tell whether a shell command only runs the plugins' own scripts, ssh to dev builds and read-only filters.
  * Used by yolo mode to skip Claude Code's own permission prompt for them.
  * @param {string} command - command line
+ * @param {string} dir - directory the command runs in
  * @returns {boolean} true if every segment is one of those
  */
-function isYoloSafeCommand(command) {
+function isYoloSafeCommand(command, dir = process.cwd()) {
   const segments = splitCommand(command);
   let core = false;
   for (const tokens of segments) {
     const prog = programName(tokens[0]);
     if ((tokens.redirects || []).some((t) => !NULL_DEVICES.has(t.toLowerCase()))) return false;
-    if (prog === 'node' && tokens[1] && PLUGIN_SCRIPT.test(tokens[1])) { core = true; continue; }
+    if (prog === 'node' && tokens[1] && isTrustedPluginScript(tokens[1], dir)) { core = true; continue; }
     if (prog === 'ssh') {
       const { host } = sshTarget(tokens.slice(1));
       if (!host || !/\.dev\.odoo\.com$/.test(host)) return false;
@@ -496,7 +537,7 @@ function evaluate(event, deps) {
   if (result) return result.yolo ? { decision: ALLOW, reason: `Modo yolo: ${result.reason}` } : result;
   const name = event.tool_name || '';
   if (CHROME_TOOL.test(name)) return { decision: ALLOW, reason: 'Modo yolo: Claude in Chrome en un dominio permitido.' };
-  if (SHELL_TOOLS.has(name) && isYoloSafeCommand(String((event.tool_input || {}).command || ''))) {
+  if (SHELL_TOOLS.has(name) && isYoloSafeCommand(String((event.tool_input || {}).command || ''), cwd)) {
     return { decision: ALLOW, reason: 'Modo yolo: script del plugin o ssh a un build de desarrollo/staging.' };
   }
   return null;

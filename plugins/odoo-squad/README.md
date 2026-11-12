@@ -71,7 +71,7 @@ Los subagentes no pueden hacer commit ni push: el guard lo deniega y solo el orq
 ## Pendiente (próximas versiones)
 
 - Entorno local: Postgres global (Docker, config en `~/.oap/`, bases desechables con prefijo `oap_`) y código fuente de Odoo para ejecutar tests antes del push.
-- Comprobar en una sesión real que el `allow` del modo `yolo` evita las preguntas de los subagentes en segundo plano y que el campo `agent_id` llega al guard.
+- Comprobar en una sesión real que el `allow` del modo `yolo` evita las preguntas de los subagentes en segundo plano.
 
 ## Desarrollo
 

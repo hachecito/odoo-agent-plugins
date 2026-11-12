@@ -59,8 +59,8 @@ Opcional y por proyecto, desactivado por defecto (`confirm`). Cambiarlo con `con
 - **`yolo`**: el guard responde `allow` (sin pregunta) a:
   - las confirmaciones que marca como seguras: push a staging, incluido con tags, y JavaScript en Chrome en dominios permitidos;
   - las herramientas de Claude in Chrome sin otra regla;
-  - los scripts propios de los plugins (`node <ruta>/odoosh-browser|odoo-squad/.../scripts/*.js`), sin redirecciones a archivos;
-  - `ssh` a `*.dev.odoo.com`, solo combinado con filtros de lectura (`grep`, `tail`, `head`, `wc`, `sort`…).
+  - una lista cerrada de scripts propios (`run-state`, `notes`, `report`, `ssh-check`, `config`, `oap`, `tasks`), solo si están en la carpeta real de `odoosh-browser` u `odoo-squad` (la del propio guard, su hermana o la instalación del marketplace) y sin redirecciones a archivos. Una carpeta con el mismo nombre dentro del repo no cuenta;
+  - `ssh` a `*.dev.odoo.com`, combinado en local solo con filtros (`grep`, `tail`, `head`, `wc`, `sort`…). El comando **remoto** puede ser cualquiera que no esté en la lista denegada (`odoosh-push`, `git push`, `rm -rf`, SQL de escritura): por ejemplo `odoo-bin --test-enable`, que escribe en la base de staging.
 - **En cualquier nivel siguen preguntando**:
   - la configuración del plugin y `memory.md`;
   - el push a ramas que no son staging;
@@ -77,4 +77,4 @@ Riesgo asumido con `yolo`: el JavaScript en Chrome se ejecuta con la sesión del
 
 ## Subagentes
 
-Durante una tarea, `git commit` y `git push` lanzados desde un subagente se deniegan: los cambios se devuelven al hilo principal, que los revisa y hace commit y push. Se identifica con el campo `agent_id` de la entrada del hook, que según la documentación de Claude Code solo está presente en subagentes. **No verificado** en una sesión real.
+Durante una tarea, `git commit` y `git push` lanzados desde un subagente se deniegan: los cambios se devuelven al hilo principal, que los revisa y hace commit y push. Se identifica con el campo `agent_id` de la entrada del hook, que según la documentación de Claude Code solo está presente en subagentes. Comprobado con `claude -p`: una llamada del hilo principal llega sin `agent_id` y la de un subagente con él.
