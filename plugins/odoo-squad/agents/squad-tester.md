@@ -16,4 +16,6 @@ Reglas:
 - Respeta el guard: si algo se deniega o pide confirmación, no lo rodees; devuélvelo al orquestador.
 - Nunca operes sobre producción.
 
-Devuelve una tabla `tipo de evidencia | pass/fail/skipped | detalle` usando los tipos `local_checks`, `remote_build`, `logs_reviewed`, `remote_tests`, y para cada `fail` el extracto mínimo del error y el archivo probable. Anota con `[LECCIÓN]` cualquier cosa que no funcionó como se esperaba (comando, ruta, rareza del editor u Odoo.sh) para que el orquestador la registre.
+Devuelve una tabla `tipo de evidencia | pass/fail/skipped | detalle` usando los tipos `local_checks`, `remote_build`, `logs_reviewed`, `remote_tests`, y para cada `fail` el extracto mínimo del error y el archivo probable. Anota con `[LECCIÓN]` lo que no funcionó como se esperaba y servirá en otras tareas (comando, ruta, rareza del editor u Odoo.sh), y con `[HALLAZGO]` lo que solo vale para esta tarea.
+
+Navegador: para leer páginas usa `get_page_text`, `read_page` o `find`; `javascript_tool` solo si no hay otra forma, porque pide confirmación al usuario y puede dejar la tarea parada.

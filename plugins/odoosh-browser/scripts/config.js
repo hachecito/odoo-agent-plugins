@@ -81,17 +81,18 @@ function main() {
     console.log(`staging_branch = ${branch}`);
   } else if (cmd === 'set-autonomy') {
     const mode = rest[0];
-    if (!['confirm', 'auto'].includes(mode)) {
-      console.error('Uso: config.js set-autonomy confirm|auto  (auto: sin confirmación al hacer push a la rama staging; producción sigue denegada)');
+    if (!['confirm', 'auto', 'yolo'].includes(mode)) {
+      console.error('Uso: config.js set-autonomy confirm|auto|yolo  (auto: push a staging sin confirmación; yolo: además scripts del plugin, Chrome y ssh a builds de desarrollo sin confirmación; producción sigue denegada)');
       process.exit(1);
     }
-    saveConfig(loaded.path, { ...loaded.config, autonomy: { ...loaded.config.autonomy, push_staging: mode } });
-    console.log(`autonomy.push_staging = ${mode}`);
+    const autonomy = { push_staging: mode === 'confirm' ? 'confirm' : 'auto', yolo: mode === 'yolo' };
+    saveConfig(loaded.path, { ...loaded.config, autonomy });
+    console.log(`autonomy = ${JSON.stringify(autonomy)}`);
   } else if (cmd === 'set-ssh') {
     saveConfig(loaded.path, { ...loaded.config, ssh: { ...loaded.config.ssh, enabled: opts.enabled !== 'false', key: opts.key || loaded.config.ssh.key } });
     console.log('ssh actualizado');
   } else {
-    console.error('Uso: config.js init|show|validate|migrate|set-staging <rama>|set-autonomy confirm|auto|set-ssh --enabled true|false [--key ruta] [--dir ruta]');
+    console.error('Uso: config.js init|show|validate|migrate|set-staging <rama>|set-autonomy confirm|auto|yolo|set-ssh --enabled true|false [--key ruta] [--dir ruta]');
     process.exit(1);
   }
 }

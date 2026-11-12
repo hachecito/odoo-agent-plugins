@@ -208,3 +208,67 @@ test('other browser MCPs are denied during a task, free outside', () => {
   }
   assert.strictEqual(decide('mcp__claude-in-chrome__navigate', { url: 'https://www.odoo.sh/project/x' }), null);
 });
+
+test('redirections are not refspecs nor writes: 2>&1 push to staging, reading config with 2>/dev/null', () => {
+  const auto = { config: { ...CONFIG, autonomy: { push_staging: 'auto', yolo: false } } };
+  assert.strictEqual(bash('git push origin staging-agent 2>&1 | tail -15', auto), null);
+  assert.strictEqual(bash('git push origin staging-agent 2>$null', auto), null);
+  assert.strictEqual(bash('git push origin staging-agent 2>&1 | tail -5'), 'ask');
+  assert.strictEqual(bash('cat .oap/odoosh-browser/config.json 2>/dev/null'), null);
+  assert.strictEqual(bash('node C:/x/scripts/run-state.js evidence --kind push --status pass --detail "abc -> origin/staging-agent"'), null);
+  assert.strictEqual(bash('echo {} > .oap/odoosh-browser/config.json'), 'ask');
+  assert.strictEqual(bash('cp other.json .oap/odoosh-browser/config.json'), 'ask');
+});
+
+/**
+ * Run the full policy (yolo included) and return decision.
+ * @param {string} tool - tool name
+ * @param {object} input - tool input
+ * @param {object} opts - {yolo, active, agentId}
+ * @returns {string|null} decision
+ */
+function decideYolo(tool, input, opts = {}) {
+  const config = { ...CONFIG, autonomy: { push_staging: 'auto', yolo: opts.yolo !== false } };
+  const res = evaluate(
+    { tool_name: tool, tool_input: input, cwd: process.cwd(), agent_id: opts.agentId },
+    { loadConfig: () => ({ config, root: '.', path: '.' }), branchOf: () => 'staging-agent', runActive: () => opts.active !== false },
+  );
+  return res ? res.decision : null;
+}
+
+test('yolo: approves safe asks and own scripts, keeps config changes, unknown domains and denies', () => {
+  const sh = (command, opts) => decideYolo('Bash', { command }, opts);
+  const js = { action: 'javascript_exec', text: 'document.body.innerText' };
+  assert.strictEqual(sh('git push origin staging-agent'), 'allow');
+  assert.strictEqual(sh('git push origin staging-agent --tags'), 'allow');
+  assert.strictEqual(decideYolo('mcp__claude-in-chrome__javascript_tool', js), 'allow');
+  assert.strictEqual(decideYolo('mcp__claude-in-chrome__navigate', { url: 'https://www.odoo.sh/project/x' }), 'allow');
+  assert.strictEqual(sh('node "C:/Users/u/.claude/plugins/cache/m/odoosh-browser/0.8.0/scripts/run-state.js" state REMOTE_BUILD'), 'allow');
+  assert.strictEqual(sh('node "C:/u/plugins/odoo-squad/scripts/oap.js" notes.js show 2>&1 | tail -5'), 'allow');
+  assert.strictEqual(sh('ssh 1@proj-staging-1.dev.odoo.com "grep -n ERROR ~/logs/odoo.log | tail -n 50"'), 'allow');
+  // Still asking or denied in yolo
+  assert.strictEqual(sh('node "C:/u/plugins/odoo-squad/scripts/oap.js" config.js set-autonomy confirm'), 'ask');
+  assert.strictEqual(sh('git push origin feature-x'), 'ask');
+  assert.strictEqual(sh('git remote set-url origin git@x:y.git'), 'ask');
+  assert.strictEqual(decideYolo('mcp__claude-in-chrome__navigate', { url: 'https://evil.example.com' }), 'ask');
+  assert.strictEqual(decideYolo('Edit', { file_path: '/r/.oap/odoosh-browser/config.json' }), 'ask');
+  assert.strictEqual(sh('git push origin main'), 'deny');
+  assert.strictEqual(sh('git push --force origin staging-agent'), 'deny');
+  assert.strictEqual(sh('ssh 1@x.dev.odoo.com "rm -rf ~/src"'), 'deny');
+  assert.strictEqual(decideYolo('mcp__claude-in-chrome__navigate', { url: 'https://cliente.odoo.com/odoo' }), 'deny');
+  // Not approved: other programs, writes to files, scripts outside the plugins
+  assert.strictEqual(sh('node C:/tmp/scripts/run-state.js show'), null);
+  assert.strictEqual(sh('node "C:/u/plugins/odoosh-browser/scripts/report.js" > out.md'), null);
+  assert.strictEqual(sh('python -c "print(1)"'), null);
+  // Without yolo or outside a task, nothing is auto-approved
+  assert.strictEqual(decideYolo('mcp__claude-in-chrome__javascript_tool', js, { yolo: false }), 'ask');
+  assert.strictEqual(sh('node "C:/u/plugins/odoosh-browser/scripts/run-state.js" show', { active: false }), null);
+});
+
+test('subagents cannot commit or push during a task', () => {
+  assert.strictEqual(decideYolo('Bash', { command: 'git push origin staging-agent' }, { agentId: 'a1' }), 'deny');
+  assert.strictEqual(decideYolo('Bash', { command: 'git commit -m x' }, { agentId: 'a1' }), 'deny');
+  assert.strictEqual(decideYolo('Bash', { command: 'git -C sub commit -m x' }, { agentId: 'a1' }), 'deny');
+  assert.strictEqual(decideYolo('Bash', { command: 'git status' }, { agentId: 'a1' }), null);
+  assert.strictEqual(decideYolo('Bash', { command: 'git commit -m x' }), null);
+});

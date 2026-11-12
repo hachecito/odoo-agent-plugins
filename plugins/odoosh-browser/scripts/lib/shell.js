@@ -4,26 +4,38 @@ const SEPARATORS = ['&&', '||', ';', '|', '\n', '\r'];
 
 /**
  * Split a shell command line into segments of tokens, honoring quotes.
+ * Redirections (2>&1, > file, 2>$null...) are not tokens: their targets go to segment.redirects.
  * Works well enough for bash, PowerShell and cmd one-liners.
  * @param {string} command - raw command line
- * @returns {string[][]} list of segments, each a list of tokens
+ * @returns {string[][]} list of segments, each a list of tokens with a `redirects` array property
  */
 function splitCommand(command) {
   const segments = [];
   let tokens = [];
+  let redirects = [];
   let current = '';
   let hasToken = false;
   let quote = null;
+  let redirectNext = false;
 
   const pushToken = () => {
-    if (hasToken) tokens.push(current);
+    if (hasToken) {
+      if (redirectNext) redirects.push(current);
+      else tokens.push(current);
+      redirectNext = false;
+    }
     current = '';
     hasToken = false;
   };
   const pushSegment = () => {
     pushToken();
-    if (tokens.length) segments.push(tokens);
+    redirectNext = false;
+    if (tokens.length) {
+      tokens.redirects = redirects;
+      segments.push(tokens);
+    }
     tokens = [];
+    redirects = [];
   };
 
   for (let i = 0; i < command.length; i++) {
@@ -45,6 +57,15 @@ function splitCommand(command) {
     if (sep) {
       pushSegment();
       i += sep.length - 1;
+      continue;
+    }
+    if (ch === '>' || ch === '<') {
+      // A bare fd number or "&" right before the operator belongs to it (2>, &>), not to the command.
+      if (/^\d*&?$/.test(current)) { current = ''; hasToken = false; } else pushToken();
+      while (command[i + 1] === '>' || command[i + 1] === '|') i++;
+      const dup = /^&(\d+|-)/.exec(command.slice(i + 1));
+      if (dup) i += dup[0].length; // 2>&1, >&2: fd duplication, no target
+      else redirectNext = true;
       continue;
     }
     if (/\s/.test(ch)) {

@@ -7,14 +7,43 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
+// odoo-squad relies on .oap/, autonomy (yolo) and the subagent rules of this odoosh-browser version.
+const MIN_VERSION = '0.8.0';
+
 /**
- * Locate the scripts folder of odoosh-browser: env override, installed plugin, or sibling folder (monorepo checkout).
+ * Read the version of a plugin folder.
+ * @param {string} dir - plugin root
+ * @returns {string|null} version from .claude-plugin/plugin.json
+ */
+function pluginVersion(dir) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(dir, '.claude-plugin', 'plugin.json'), 'utf8')).version || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Compare two x.y.z versions.
+ * @param {string} a - version
+ * @param {string} b - version
+ * @returns {number} negative, zero or positive
+ */
+function compareVersions(a, b) {
+  const pa = String(a).split('.').map(Number);
+  const pb = String(b).split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
+  return 0;
+}
+
+/**
+ * Locate the scripts folder of odoosh-browser (>= MIN_VERSION): env override, installed plugin, or sibling folder.
  * @param {object} env - environment variables
  * @param {string} home - user home directory
  * @param {string} here - directory of this script
- * @returns {string|null} absolute scripts directory, or null
+ * @returns {{dir: string|null, old: string|null}} scripts directory, or the version of an outdated install found
  */
-function findScriptsDir(env = process.env, home = os.homedir(), here = __dirname) {
+function locate(env = process.env, home = os.homedir(), here = __dirname) {
   const candidates = [];
   if (env.OAP_ODOOSH_BROWSER) candidates.push(env.OAP_ODOOSH_BROWSER);
   try {
@@ -26,16 +55,30 @@ function findScriptsDir(env = process.env, home = os.homedir(), here = __dirname
     // Not installed through the marketplace: fall through to the sibling folder.
   }
   candidates.push(path.resolve(here, '..', '..', 'odoosh-browser'));
-  const hit = candidates.find((c) => c && fs.existsSync(path.join(c, 'scripts', 'run-state.js')));
-  return hit ? path.join(hit, 'scripts') : null;
+  const found = candidates.filter((c) => c && fs.existsSync(path.join(c, 'scripts', 'run-state.js')));
+  const hit = found.find((c) => compareVersions(pluginVersion(c) || '0', MIN_VERSION) >= 0);
+  return { dir: hit ? path.join(hit, 'scripts') : null, old: !hit && found.length ? (pluginVersion(found[0]) || 'desconocida') : null };
+}
+
+/**
+ * Locate the scripts folder of odoosh-browser.
+ * @param {object} env - environment variables
+ * @param {string} home - user home directory
+ * @param {string} here - directory of this script
+ * @returns {string|null} absolute scripts directory, or null
+ */
+function findScriptsDir(env, home, here) {
+  return locate(env, home, here).dir;
 }
 
 /** Entry point. */
 function main() {
   const [script, ...args] = process.argv.slice(2);
-  const dir = findScriptsDir();
+  const { dir, old } = locate();
   if (!dir) {
-    console.error('odoosh-browser no está instalado: claude plugin install odoosh-browser@odoo-agent-plugins');
+    console.error(old
+      ? `odoosh-browser ${old} es anterior a la ${MIN_VERSION} que necesita odoo-squad: claude plugin marketplace update odoo-agent-plugins y claude plugin update odoosh-browser@odoo-agent-plugins`
+      : 'odoosh-browser no está instalado: claude plugin install odoosh-browser@odoo-agent-plugins');
     process.exit(2);
   }
   if (script === '--where') {
@@ -52,4 +95,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { findScriptsDir };
+module.exports = { findScriptsDir, locate, compareVersions, MIN_VERSION };

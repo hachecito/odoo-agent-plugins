@@ -15,7 +15,7 @@ function opt(args, name) {
   return i >= 0 ? args[i + 1] : undefined;
 }
 
-/** Entry point: show | add [--tag t] --text x [--source x] | remove <n>. */
+/** Entry point: show [--tag t] | add [--tag t] --text x [--source x] | remove <n>. */
 function main() {
   const [cmd, ...args] = process.argv.slice(2);
   const loaded = loadConfig(opt(args, 'dir') || process.cwd());
@@ -25,7 +25,7 @@ function main() {
   }
   const root = loaded.root;
   if (cmd === 'show') {
-    process.stdout.write(renderNotes(loadNotes(root)));
+    process.stdout.write(renderNotes(loadNotes(root), opt(args, 'tag')));
   } else if (cmd === 'add') {
     const res = addNote(root, { tag: opt(args, 'tag') || opt(args, 'section'), text: opt(args, 'text') || '', source: opt(args, 'source') });
     if (!res.added) {
@@ -40,7 +40,7 @@ function main() {
     }
     console.log('Nota eliminada.');
   } else {
-    console.error(`Uso: notes.js show | add [--tag etiqueta] --text "..." [--source "..."] | remove <n>`);
+    console.error(`Uso: notes.js show [--tag etiqueta] | add [--tag etiqueta] --text "..." [--source "..."] | remove <n>`);
     process.exit(1);
   }
 }

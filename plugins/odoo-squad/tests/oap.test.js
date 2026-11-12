@@ -5,7 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { findScriptsDir } = require('../scripts/oap');
+const { findScriptsDir, locate, compareVersions, MIN_VERSION } = require('../scripts/oap');
 
 const OAP = path.join(__dirname, '..', 'scripts', 'oap.js');
 const AGENTS = path.join(__dirname, '..', 'agents');
@@ -13,12 +13,15 @@ const AGENTS = path.join(__dirname, '..', 'agents');
 /**
  * Create a fake odoosh-browser install folder.
  * @param {string} base - parent directory
+ * @param {string} version - plugin version
  * @returns {string} install path
  */
-function fakePlugin(base) {
+function fakePlugin(base, version = '0.8.0') {
   const dir = path.join(base, 'odoosh-browser');
   fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
+  fs.mkdirSync(path.join(dir, '.claude-plugin'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'scripts', 'run-state.js'), '');
+  fs.writeFileSync(path.join(dir, '.claude-plugin', 'plugin.json'), JSON.stringify({ version }));
   return dir;
 }
 
@@ -41,8 +44,22 @@ test('findScriptsDir: env override, then installed plugin, then sibling, else nu
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
+test('locate: skips odoosh-browser versions older than the minimum', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'oap-'));
+  const old = fakePlugin(path.join(tmp, 'old'), '0.4.0');
+  assert.deepStrictEqual(locate({ OAP_ODOOSH_BROWSER: old }, tmp, tmp), { dir: null, old: '0.4.0' });
+  const sibling = path.join(tmp, 'plugins');
+  fakePlugin(sibling, '0.10.0');
+  const res = locate({ OAP_ODOOSH_BROWSER: old }, tmp, path.join(sibling, 'odoo-squad', 'scripts'));
+  assert.strictEqual(res.dir, path.join(sibling, 'odoosh-browser', 'scripts'));
+  assert.ok(compareVersions('0.10.0', MIN_VERSION) > 0 && compareVersions('0.7.9', MIN_VERSION) < 0);
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
+
 test('oap.js: runs odoosh-browser scripts, rejects anything else', () => {
-  const ok = spawnSync(process.execPath, [OAP, 'notes.js', 'show'], { cwd: os.tmpdir(), encoding: 'utf8' });
+  // Pin the sibling checkout so the result does not depend on the odoosh-browser installed on this machine.
+  const env = { ...process.env, OAP_ODOOSH_BROWSER: path.join(__dirname, '..', '..', 'odoosh-browser') };
+  const ok = spawnSync(process.execPath, [OAP, 'notes.js', 'show'], { cwd: os.tmpdir(), encoding: 'utf8', env });
   assert.strictEqual(ok.status, 1); // no config in a temp dir: the script ran and reported it
   assert.ok(/No hay \.oap/.test(ok.stderr), ok.stderr);
   for (const bad of ['../x.js', 'a/b.js', 'notes', 'nonexistent.js']) {
