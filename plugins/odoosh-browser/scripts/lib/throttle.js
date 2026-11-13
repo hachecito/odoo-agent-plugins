@@ -3,6 +3,19 @@ const fs = require('fs');
 const { loadRun } = require('./run');
 const { agentFile } = require('./config');
 
+// Only calls that poll the build status are spaced out; typing, clicks, waits and screenshots
+// (e.g. running tests in the editor terminal) are never delayed.
+const POLL_TOOLS = new Set(['navigate', 'get_page_text', 'read_page', 'find']);
+
+/**
+ * Tell whether a Claude in Chrome tool call polls a page (and may be spaced out).
+ * @param {string} toolName - full tool name (mcp__...claude-in-chrome__<tool>)
+ * @returns {boolean} true for page-reading tools
+ */
+function isPollCall(toolName) {
+  return POLL_TOOLS.has(String(toolName || '').split('__').pop());
+}
+
 /**
  * Compute how long to wait before the next browser call.
  * @param {number|null} lastMs - epoch ms of the previous call, or null
@@ -16,12 +29,14 @@ function computeWaitMs(lastMs, nowMs, intervalSec) {
 }
 
 /**
- * Space out browser calls while the run waits for an Odoo.sh build (state REMOTE_BUILD).
+ * Space out page-polling browser calls while the run waits for an Odoo.sh build (state REMOTE_BUILD).
  * @param {{root: string, config: object}} loaded - loaded project config
  * @param {function(number): Promise<void>} sleep - sleep implementation (ms)
+ * @param {string} toolName - full tool name of the call
  * @returns {Promise<number>} milliseconds actually waited
  */
-async function throttleBrowser(loaded, sleep) {
+async function throttleBrowser(loaded, sleep, toolName) {
+  if (!isPollCall(toolName)) return 0;
   const run = loadRun(loaded.root);
   if (!run || run.state !== 'REMOTE_BUILD') return 0;
   const p = agentFile(loaded.root, 'throttle');
@@ -33,4 +48,4 @@ async function throttleBrowser(loaded, sleep) {
   return waitMs;
 }
 
-module.exports = { computeWaitMs, throttleBrowser };
+module.exports = { computeWaitMs, throttleBrowser, isPollCall };

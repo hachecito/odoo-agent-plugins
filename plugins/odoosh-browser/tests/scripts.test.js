@@ -117,12 +117,17 @@ test('throttle: browser calls spaced while waiting for build', async () => {
   const sleep = async (ms) => { waits.push(ms); };
   const setState = (state) => fs.writeFileSync(path.join(root, '.oap', 'odoosh-browser', 'run.json'), JSON.stringify({ state }));
 
+  const nav = 'mcp__claude-in-chrome__navigate';
   setState('IMPLEMENTATION');
-  assert.strictEqual(await throttleBrowser(loaded, sleep), 0);
+  assert.strictEqual(await throttleBrowser(loaded, sleep, nav), 0);
   setState('REMOTE_BUILD');
-  await throttleBrowser(loaded, sleep);            // first call: no previous timestamp
-  const waited = await throttleBrowser(loaded, sleep); // immediate second call must wait ~60 s
+  await throttleBrowser(loaded, sleep, nav);            // first call: no previous timestamp
+  const waited = await throttleBrowser(loaded, sleep, 'mcp__claude-in-chrome__get_page_text'); // immediate second poll waits ~60 s
   assert.ok(waited > 55000 && waited <= 60000, String(waited));
+  // Terminal work during the build state is never delayed
+  for (const t of ['computer', 'form_input', 'javascript_tool', 'tabs_context_mcp']) {
+    assert.strictEqual(await throttleBrowser(loaded, sleep, `mcp__claude-in-chrome__${t}`), 0, t);
+  }
   fs.rmSync(root, { recursive: true, force: true });
 });
 
