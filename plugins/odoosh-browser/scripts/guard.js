@@ -52,10 +52,10 @@ function main() {
     }
     try {
       const result = evaluate(event, { loadConfig, branchOf, runActive: (root) => isRunActive(root) });
-      // While waiting for an Odoo.sh build, space out allowed browser calls instead of letting the agent poll.
+      // While waiting for an Odoo.sh build, space out page-polling browser calls instead of letting the agent poll.
       if (CHROME_TOOL.test(event.tool_name || '') && !(result && result.decision === DENY)) {
         const loaded = loadConfig(event.cwd || process.cwd());
-        if (loaded) await throttleBrowser(loaded, (ms) => new Promise((r) => setTimeout(r, ms)));
+        if (loaded) await throttleBrowser(loaded, (ms) => new Promise((r) => setTimeout(r, ms)), event.tool_name);
       }
       if (result) emit(result);
     } catch (err) {

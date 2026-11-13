@@ -46,11 +46,11 @@ El MCP de GitHub configurado **no expone** el commit status ni los check runs (c
 
 El build tarda según el tamaño de la base de datos (puede ser bastante en clientes grandes) y **durante el build el SSH no está disponible**.
 
-1. Tras el push: `run-state.js state REMOTE_BUILD`. Mientras la ejecución esté en ese estado, el hook **espacia las llamadas a Claude in Chrome** (mínimo `build_poll_seconds`, 60 s por defecto): no hace falta esperar a mano ni conviene encadenar llamadas.
+1. Tras el push: `run-state.js state REMOTE_BUILD`. Mientras la ejecución esté en ese estado, el hook **espacia las lecturas de página de Claude in Chrome** (`navigate`, `get_page_text`, `read_page`, `find`; mínimo `build_poll_seconds`, 60 s por defecto): no hace falta esperar a mano. Escribir en la terminal, hacer clic, esperar y las capturas no se retrasan.
 2. Comprobar el estado en la pestaña **HISTORY** leyendo el **texto** de la página (no capturas repetidas): estados observados `Build queued`, en curso, `Test: Success`, `Test: Warning` (ver [reference/odoo-sh-ui.md](reference/odoo-sh-ui.md)).
 3. **No usar SSH** mientras el build esté encolado o en curso.
 4. En cada comprobación, `run-state.js build-wait`: indica los minutos de espera y, si se supera `build_timeout_minutes` (60 por defecto), pasa la ejecución a BLOCKED; entonces avisar al usuario sin seguir esperando.
-5. Cuando el build termine: registrar `remote_build` y pasar a `run-state.js state REMOTE_TESTING` (el espaciado de llamadas se desactiva).
+5. **En cuanto el build termine**, antes de leer logs o lanzar tests: registrar `remote_build` y pasar a `run-state.js state REMOTE_TESTING`. Si se sigue en `REMOTE_BUILD`, cada lectura de página espera `build_poll_seconds`.
 
 ## 2. Estado y logs
 

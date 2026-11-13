@@ -56,7 +56,11 @@ Las carpetas de tarea se gestionan con `node "${CLAUDE_PLUGIN_ROOT}/scripts/task
 - El push a staging pide confirmación al usuario salvo en autonomía `auto` o `yolo` (se cambia con `oap config set-autonomy confirm|auto|yolo`). Nunca proponer ni cambiar ese ajuste por tu cuenta. Producción sigue denegada en cualquier modo.
 
 ### 5. Build y tests remotos (`REMOTE_BUILD`, `REMOTE_TESTING`)
-- Invocar `squad-tester` fase **remote**. Registrar `remote_build`, `logs_reviewed` y `remote_tests`.
+Son **dos** encargos al tester, nunca uno: el cambio de estado entre ambos lo haces tú, y mientras la ejecución sigue en `REMOTE_BUILD` el guard espacia las lecturas de página de Chrome (60 s por defecto).
+1. `oap run-state state REMOTE_BUILD` e invocar `squad-tester` fase **build**: solo espera a que termine el build y devuelve su resultado.
+2. En cuanto vuelva: registrar `remote_build` y `oap run-state state REMOTE_TESTING`. Si el build falló, ir al bucle de corrección.
+3. Invocar `squad-tester` fase **remote-tests**: logs y tests del módulo. Registrar `logs_reviewed` y `remote_tests`.
+- Si `ssh.enabled` es `false`, los tests se lanzan escribiendo en la terminal del editor web, lo que es mucho más lento. Al terminar la tarea, recomendar al usuario activar SSH con `odoosh-browser:odoo-project-setup`.
 
 ### 6. Bucle de corrección
 Si una fase falla:
