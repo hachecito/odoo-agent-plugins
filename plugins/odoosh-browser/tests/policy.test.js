@@ -283,22 +283,6 @@ test('subagents cannot commit or push during a task', () => {
   assert.strictEqual(decideYolo('Bash', { command: 'git commit -m x' }), null);
 });
 
-test('whole-disk searches are denied during a task, scoped ones pass', () => {
-  assert.strictEqual(bash('find / -iname "mail_thread.py" 2>/dev/null | head -5'), 'deny');
-  assert.strictEqual(bash('find / -maxdepth 6 -iname "base_partner_merge.py"'), 'deny');
-  assert.strictEqual(bash('cat .oap/odoosh-browser/config.json; find /c -name x'), 'deny');
-  assert.strictEqual(bash('grep -rn "def write" /'), 'deny');
-  assert.strictEqual(decide('PowerShell', { command: 'Get-ChildItem C:\ -Recurse -Filter mail_thread.py' }), 'deny');
-  assert.strictEqual(bash('find . -iname "*.py" -path "*addons*"'), null);
-  assert.strictEqual(bash('find ~/src/odoo -name mail_thread.py'), null);
-  assert.strictEqual(bash('grep -rn "def write" addons/'), null);
-  assert.strictEqual(bash('ls -la /'), null);
-  assert.strictEqual(bash('cmd /c "dir /s /b *.py"'), null);
-  assert.strictEqual(bash('where /r . odoo-bin'), null);
-  assert.strictEqual(bash('cmd /c "dir /s /b C:\\"'), 'deny');
-  assert.strictEqual(bash('find / -name x', { active: false }), null);
-});
-
 test('subagents cannot write run state or memory during a task', () => {
   const sub = (command, opts = {}) => decideYolo('Bash', { command }, { agentId: 'a1', ...opts });
   assert.strictEqual(sub('node "C:/p/scripts/run-state.js" evidence --kind remote_tests --status pass --detail x'), 'deny');

@@ -76,8 +76,6 @@ En **cualquier** nivel siguen preguntando: cambios de configuración, push a otr
 
 Durante una tarea, un **subagente** no puede hacer `git commit` ni `git push` ni escribir el estado o la memoria con `run-state.js`/`notes.js` (denegado): solo el hilo principal. Se detecta con el campo `agent_id` que Claude Code añade a los hooks de subagentes.
 
-También se deniegan durante una tarea las búsquedas en todo el disco (`find /`, `Get-ChildItem C:\ -Recurse`…), que en Windows pueden tardar horas y dejar procesos colgados.
-
 Todo el estado del plugin vive en `.oap/` (Odoo Agent Plugins), en la raíz del repo:
 
 ```

@@ -75,10 +75,6 @@ Opcional y por proyecto, desactivado por defecto (`confirm`). Cambiarlo con `con
 
 Riesgo asumido con `yolo`: el JavaScript en Chrome se ejecuta con la sesión del usuario en Odoo.sh y en las instancias de staging. Una página manipulada podría inducir al agente a ejecutar algo no deseado. Solo debe activarse en proyectos de confianza.
 
-## Búsquedas en todo el disco
-
-Durante una tarea se deniegan las búsquedas recursivas desde la raíz de un disco (`find /`, `find /c`, `grep -r … /`, `rg … /`, `Get-ChildItem C:\ -Recurse`, `dir /s C:\`). En Windows pueden durar horas. Además, Claude Code pasa el comando a segundo plano a los 2 minutos y el agente espera un aviso que tarda en llegar. Se observó que, tras detener una de esas tareas con TaskStop, el proceso `find` seguía vivo días después. La causa no se ha investigado. El motivo de la denegación indica dónde buscar el código de Odoo: el repo, GitHub o `~/src/odoo` en Odoo.sh.
-
 ## Subagentes
 
 Durante una tarea, `git commit` y `git push` lanzados desde un subagente se deniegan: los cambios se devuelven al hilo principal, que los revisa y hace commit y push. También se le deniegan las escrituras del estado y la memoria (`run-state.js` `init|state|evidence|cycle|close` y `notes.js` `add|remove|migrate`, directos o por `oap.js`): un subagente podía sobrescribir una evidencia más completa del hilo principal. `show` y `build-wait` siguen permitidos. Se identifica con el campo `agent_id` de la entrada del hook, que según la documentación de Claude Code solo está presente en subagentes. Comprobado con `claude -p`: una llamada del hilo principal llega sin `agent_id` y la de un subagente con él.

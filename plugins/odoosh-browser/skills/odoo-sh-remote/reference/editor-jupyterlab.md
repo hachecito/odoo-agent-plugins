@@ -41,9 +41,10 @@ JupyterLab abre archivos y carpetas por URL con `/lab/tree/<ruta>`; en Odoo.sh e
 | Log del servidor | `https://<build>/odoo-sh/editor/lab/tree/logs/odoo.log` |
 | Código de la rama | `https://<build>/odoo-sh/editor/lab/tree/src/user` |
 | Un módulo concreto | `https://<build>/odoo-sh/editor/lab/tree/src/user/<modulo>` |
+| Código de Odoo y de enterprise | `https://<build>/odoo-sh/editor/lab/tree/src/odoo` y `.../src/enterprise` (en la terminal, `~/src/odoo` y `~/src/enterprise`) |
 | Mantener el explorador en la raíz | añadir `?file-browser-path=/` |
 
-Rutas `logs` y `src/user` confirmadas por el usuario; el patrón `/lab/tree/<ruta>` es de la documentación de JupyterLab.
+Rutas `logs`, `src/user`, `src/odoo` y `src/enterprise` confirmadas por el usuario; el patrón `/lab/tree/<ruta>` es de la documentación de JupyterLab.
 
 **[no verificado] Lectura por API**: Jupyter Server expone `GET /api/contents/<ruta>?content=1&format=text`, que devuelve JSON con el campo `content`. En Odoo.sh sería `https://<build>/odoo-sh/editor/api/contents/logs/odoo.log?content=1&format=text`. Devuelve el archivo **entero**: usarla solo para archivos pequeños (por ejemplo una salida ya filtrada en `~/agent-out.txt`), **nunca para logs**. Solo `GET`: está prohibido escribir por API.
 

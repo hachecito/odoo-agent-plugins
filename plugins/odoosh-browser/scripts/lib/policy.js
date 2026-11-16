@@ -407,32 +407,6 @@ function evaluateConfigWrite(tokens) {
   return null;
 }
 
-// Filesystem roots: /, /c, /mnt/c, C:, C:\ and C:/.
-const DISK_ROOT = /^(\/|\/[a-z]\/?|\/mnt\/[a-z]\/?|[a-z]:[\\/]?|\\)$/i;
-const RECURSIVE_LISTERS = { find: null, rg: null, grep: /^-[a-zA-Z]*[rR]|^--recursive$/, 'get-childitem': /^-r(ecurse)?$/i, gci: /^-r(ecurse)?$/i, dir: /^(\/s|-r(ecurse)?)$/i, ls: /^(-[a-zA-Z]*R|-recurse)$/, where: /^\/r$/i };
-
-/**
- * Detect a search over a whole disk (find /, gci C:\ -Recurse...): on Windows it can run for hours.
- * @param {string[]} tokens - segment tokens
- * @returns {{decision: string, reason: string}|null} decision
- */
-function evaluateDiskScan(tokens) {
-  const prog = programName(tokens[0]);
-  if (!(prog in RECURSIVE_LISTERS)) return null;
-  const flag = RECURSIVE_LISTERS[prog];
-  const args = tokens.slice(1);
-  if (flag && !args.some((t) => flag.test(t))) return null;
-  // cmd switches (/s, /b, /r) look like "/c": they are options, not paths.
-  const cmdStyle = prog === 'dir' || prog === 'where';
-  const paths = args.filter((t) => !(flag && flag.test(t)) && !(cmdStyle && /^\/[a-z?]+$/i.test(t)));
-  if (!paths.some((t) => DISK_ROOT.test(t))) return null;
-  return {
-    decision: DENY,
-    reason: 'Búsqueda en todo el disco bloqueada durante una tarea (puede tardar horas y quedar en segundo plano). '
-      + 'Buscar en el repo, en el código de Odoo de GitHub (odoo/odoo, rama de la versión) o en ~/src/odoo y ~/src/enterprise desde la terminal de Odoo.sh.',
-  };
-}
-
 const RUN_WRITE_CMDS = new Set(['init', 'state', 'evidence', 'cycle', 'close']);
 const NOTES_WRITE_CMDS = new Set(['add', 'remove', 'migrate']);
 
@@ -499,10 +473,9 @@ function evaluateCommand(command, ctx, depth = 0) {
     }
     const local = { ...ctx, dir };
     results.push(evaluateConfigWrite(tokens));
-    const loaded = ctx.runActive && ctx.loadConfig(dir);
-    if (loaded && ctx.runActive(loaded.root)) {
-      results.push(evaluateDiskScan(tokens));
-      if (ctx.subagent) results.push(evaluateSubagentStateWrite(tokens));
+    if (ctx.subagent) {
+      const loaded = ctx.loadConfig(dir);
+      if (loaded && ctx.runActive(loaded.root)) results.push(evaluateSubagentStateWrite(tokens));
     }
     if (prog === 'git') {
       if (rest.includes('push')) ctx.seen.push = true;
