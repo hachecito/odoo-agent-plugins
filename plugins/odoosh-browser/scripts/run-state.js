@@ -17,9 +17,16 @@ function opt(args, name) {
   return i >= 0 ? args[i + 1] : undefined;
 }
 
+const USAGE = 'Uso: run-state.js init --task "..." | state <ESTADO> [--note ...] | evidence ... | cycle | build-wait | close [--note ...] | show';
+
 /** Entry point: init | state <STATE> | evidence | cycle | show. */
 function main() {
   const [cmd, ...args] = process.argv.slice(2);
+  // A help flag never runs the command ("close --help" used to close the run).
+  if (!cmd || [cmd, ...args].some((a) => a === '--help' || a === '-h')) {
+    console.log(USAGE);
+    return;
+  }
   const loaded = loadConfig(opt(args, 'dir') || process.cwd());
   if (!loaded) {
     console.error('No hay .oap/odoosh-browser/config.json: ejecutar primero la skill odoo-project-setup.');
@@ -83,6 +90,10 @@ function main() {
     }
   } else if (cmd === 'close') {
     // Ends the run so the guard goes back to idle mode (only direct production pushes blocked).
+    if (run.closed) {
+      console.log('La ejecución ya estaba cerrada.');
+      return;
+    }
     run.closed = true;
     run.history.push({ at: now, state: run.state, note: `Ejecución cerrada${opt(args, 'note') ? `: ${opt(args, 'note')}` : ''}` });
   } else if (cmd === 'build-wait') {
@@ -104,7 +115,7 @@ function main() {
     console.log(JSON.stringify({ waiting_minutes: Math.round(minutes * 10) / 10, limit_minutes: limit, poll_seconds: loaded.config.build_poll_seconds }));
     return;
   } else if (cmd !== 'show') {
-    console.error('Uso: run-state.js init --task "..." | state <ESTADO> [--note ...] | evidence ... | cycle | build-wait | close [--note ...] | show');
+    console.error(USAGE);
     process.exit(1);
   }
   saveRun(root, run);

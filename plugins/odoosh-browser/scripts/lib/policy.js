@@ -407,6 +407,26 @@ function evaluateConfigWrite(tokens) {
   return null;
 }
 
+const RUN_WRITE_CMDS = new Set(['init', 'state', 'evidence', 'cycle', 'close']);
+const NOTES_WRITE_CMDS = new Set(['add', 'remove', 'migrate']);
+
+/**
+ * Detect a subagent writing the run state or the shared memory (directly or through oap.js).
+ * @param {string[]} tokens - segment tokens
+ * @returns {{decision: string, reason: string}|null} decision
+ */
+function evaluateSubagentStateWrite(tokens) {
+  for (let i = 0; i < tokens.length - 1; i++) {
+    const m = /(^|[\\/])(run-state|notes)(\.js)?$/.exec(tokens[i]);
+    if (!m || (!m[3] && !/(^|[\\/])oap\.js$/.test(tokens[i - 1] || ''))) continue;
+    const writes = m[2] === 'run-state' ? RUN_WRITE_CMDS : NOTES_WRITE_CMDS;
+    if (writes.has(tokens[i + 1])) {
+      return { decision: DENY, reason: `${m[2]}.js ${tokens[i + 1]} desde un subagente bloqueado: devolver la evidencia o la lección al orquestador, que es quien la registra.` };
+    }
+  }
+  return null;
+}
+
 /**
  * Tell whether a shell command only runs the plugins' own scripts, ssh to dev builds and read-only filters.
  * Used by yolo mode to skip Claude Code's own permission prompt for them.
@@ -453,6 +473,10 @@ function evaluateCommand(command, ctx, depth = 0) {
     }
     const local = { ...ctx, dir };
     results.push(evaluateConfigWrite(tokens));
+    if (ctx.subagent) {
+      const loaded = ctx.loadConfig(dir);
+      if (loaded && ctx.runActive(loaded.root)) results.push(evaluateSubagentStateWrite(tokens));
+    }
     if (prog === 'git') {
       if (rest.includes('push')) ctx.seen.push = true;
       results.push(evaluateGit(rest, local));

@@ -105,6 +105,16 @@ function setStatus(root, id, status) {
 }
 
 /**
+ * Title of a task file: its first "# " heading.
+ * @param {string} file - task.md path
+ * @returns {string|null} title, or null if there is no heading
+ */
+function taskTitle(file) {
+  const m = /^#\s+(.+?)\s*$/m.exec(fs.readFileSync(file, 'utf8'));
+  return m ? m[1].slice(0, 120) : null;
+}
+
+/**
  * Move the 0.1.0 layout (tasks/*.md and a shared plan.md) into task folders.
  * @param {string} root - repo root
  * @returns {{moved: string[], plan: string|null}} moved task ids and where plan.md went
@@ -119,7 +129,8 @@ function migrate(root) {
       if (fs.existsSync(path.join(dir, id))) continue;
       fs.mkdirSync(path.join(dir, id));
       fs.renameSync(path.join(dir, f), path.join(dir, id, 'task.md'));
-      if (!entries.some((e) => e.id === id)) entries.push({ id, status: 'migrada', title: id.replace(/^\d{8}-/, '').replace(/-/g, ' ') });
+      fs.writeFileSync(path.join(dir, id, 'hallazgos.md'), FINDINGS_HEADER, 'utf8');
+      if (!entries.some((e) => e.id === id)) entries.push({ id, status: 'migrada', title: taskTitle(path.join(dir, id, 'task.md')) || id.replace(/^\d{8}-/, '').replace(/-/g, ' ') });
       moved.push(id);
     }
   }

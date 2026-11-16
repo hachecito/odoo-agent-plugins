@@ -228,3 +228,23 @@ test('legacy .claude files: still loaded and protected, migrate moves them to .o
   assert.strictEqual(migrateLegacy(root).excluded.length, 0); // idempotent
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+test('run-state: --help never acts and close is idempotent', () => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const { spawnSync } = require('child_process');
+  const cli = path.join(__dirname, '..', 'scripts', 'run-state.js');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'odoosh-browser-'));
+  fs.mkdirSync(path.join(root, '.oap', 'odoosh-browser'), { recursive: true });
+  fs.writeFileSync(path.join(root, '.oap', 'odoosh-browser', 'config.json'), JSON.stringify({ staging_branch: 'stg', production_branches: ['main'] }));
+  const run = (...a) => spawnSync(process.execPath, [cli, ...a, '--dir', root], { encoding: 'utf8' });
+  const read = () => JSON.parse(fs.readFileSync(path.join(root, '.oap', 'odoosh-browser', 'run.json'), 'utf8'));
+  run('init', '--task', 't');
+  assert.ok(run('close', '--help').stdout.includes('Uso:'));
+  assert.ok(!read().closed);
+  run('close');
+  run('close');
+  assert.strictEqual(read().history.filter((h) => /cerrada/.test(h.note || '')).length, 1);
+  fs.rmSync(root, { recursive: true, force: true });
+});

@@ -43,13 +43,15 @@ test('migrate: 0.1.0 flat tasks and shared plan.md move into task folders', () =
   const root = tmpRepo();
   const dir = path.join(root, '.oap', 'odoo-squad', 'tasks');
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, '20260101-uno.md'), 'uno');
+  fs.writeFileSync(path.join(dir, '20260101-uno.md'), 'intro\n# Corregir vista de pedidos\ntexto');
   fs.writeFileSync(path.join(dir, '20260105-dos.md'), 'dos');
   fs.writeFileSync(path.join(root, '.oap', 'odoo-squad', 'plan.md'), 'plan');
   const res = migrate(root);
   assert.deepStrictEqual(res.moved, ['20260101-uno', '20260105-dos']);
   assert.strictEqual(fs.readFileSync(path.join(dir, '20260105-dos', 'plan.md'), 'utf8'), 'plan');
-  assert.strictEqual(fs.readFileSync(path.join(dir, '20260101-uno', 'task.md'), 'utf8'), 'uno');
+  assert.ok(fs.readFileSync(path.join(dir, '20260101-uno', 'task.md'), 'utf8').includes('# Corregir vista de pedidos'));
+  assert.ok(fs.existsSync(path.join(dir, '20260105-dos', 'hallazgos.md')));
+  assert.deepStrictEqual(readIndex(root).map((e) => e.title), ['Corregir vista de pedidos', 'dos']);
   assert.deepStrictEqual(readIndex(root).map((e) => e.status), ['migrada', 'migrada']);
   assert.deepStrictEqual(migrate(root), { moved: [], plan: null }); // idempotent
   fs.rmSync(root, { recursive: true, force: true });

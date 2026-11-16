@@ -282,3 +282,15 @@ test('subagents cannot commit or push during a task', () => {
   assert.strictEqual(decideYolo('Bash', { command: 'git status' }, { agentId: 'a1' }), null);
   assert.strictEqual(decideYolo('Bash', { command: 'git commit -m x' }), null);
 });
+
+test('subagents cannot write run state or memory during a task', () => {
+  const sub = (command, opts = {}) => decideYolo('Bash', { command }, { agentId: 'a1', ...opts });
+  assert.strictEqual(sub('node "C:/p/scripts/run-state.js" evidence --kind remote_tests --status pass --detail x'), 'deny');
+  assert.strictEqual(sub('node "C:/p/scripts/oap.js" run-state.js state REMOTE_TESTING'), 'deny');
+  assert.strictEqual(sub('node "C:/p/scripts/oap.js" run-state close'), 'deny');
+  assert.strictEqual(sub('node "C:/p/scripts/oap.js" notes.js add --text x'), 'deny');
+  assert.strictEqual(sub('node "C:/p/scripts/run-state.js" show'), null);
+  assert.strictEqual(sub('node "C:/p/scripts/oap.js" notes show'), null);
+  assert.strictEqual(sub('node "C:/p/scripts/run-state.js" evidence --kind x', { active: false }), null);
+  assert.strictEqual(decideYolo('Bash', { command: 'node "C:/p/scripts/run-state.js" evidence --kind x' }, { yolo: false }), null);
+});
