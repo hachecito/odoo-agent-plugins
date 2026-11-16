@@ -44,6 +44,18 @@ function decide(event, deps) {
   }
 
   if (event.hook_event_name === 'PostToolUseFailure') {
+    // Subagents cannot write memory (guard): they hand the lesson back, without using the main thread's hint window.
+    if (event.agent_id) {
+      if (now - (run.last_subagent_hint_ms || 0) < FAILURE_HINT_EVERY_MS) return null;
+      run.last_subagent_hint_ms = now;
+      saveRun(loaded.root, run);
+      return {
+        hookSpecificOutput: {
+          hookEventName: 'PostToolUseFailure',
+          additionalContext: '[odoosh-browser] Si resuelves este fallo y la causa no era la esperada, inclúyelo como [LECCIÓN] en tu respuesta al orquestador (no uses notes.js).',
+        },
+      };
+    }
     if (now - (run.last_failure_hint_ms || 0) < FAILURE_HINT_EVERY_MS) return null;
     run.last_failure_hint_ms = now;
     saveRun(loaded.root, run);

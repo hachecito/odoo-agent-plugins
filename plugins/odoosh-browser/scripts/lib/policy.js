@@ -422,7 +422,10 @@ function evaluateDiskScan(tokens) {
   const flag = RECURSIVE_LISTERS[prog];
   const args = tokens.slice(1);
   if (flag && !args.some((t) => flag.test(t))) return null;
-  if (!args.some((t) => DISK_ROOT.test(t))) return null;
+  // cmd switches (/s, /b, /r) look like "/c": they are options, not paths.
+  const cmdStyle = prog === 'dir' || prog === 'where';
+  const paths = args.filter((t) => !(flag && flag.test(t)) && !(cmdStyle && /^\/[a-z?]+$/i.test(t)));
+  if (!paths.some((t) => DISK_ROOT.test(t))) return null;
   return {
     decision: DENY,
     reason: 'Búsqueda en todo el disco bloqueada durante una tarea (puede tardar horas y quedar en segundo plano). '

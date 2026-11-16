@@ -293,6 +293,9 @@ test('whole-disk searches are denied during a task, scoped ones pass', () => {
   assert.strictEqual(bash('find ~/src/odoo -name mail_thread.py'), null);
   assert.strictEqual(bash('grep -rn "def write" addons/'), null);
   assert.strictEqual(bash('ls -la /'), null);
+  assert.strictEqual(bash('cmd /c "dir /s /b *.py"'), null);
+  assert.strictEqual(bash('where /r . odoo-bin'), null);
+  assert.strictEqual(bash('cmd /c "dir /s /b C:\\"'), 'deny');
   assert.strictEqual(bash('find / -name x', { active: false }), null);
 });
 
