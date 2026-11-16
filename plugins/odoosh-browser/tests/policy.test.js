@@ -282,3 +282,28 @@ test('subagents cannot commit or push during a task', () => {
   assert.strictEqual(decideYolo('Bash', { command: 'git status' }, { agentId: 'a1' }), null);
   assert.strictEqual(decideYolo('Bash', { command: 'git commit -m x' }), null);
 });
+
+test('whole-disk searches are denied during a task, scoped ones pass', () => {
+  assert.strictEqual(bash('find / -iname "mail_thread.py" 2>/dev/null | head -5'), 'deny');
+  assert.strictEqual(bash('find / -maxdepth 6 -iname "base_partner_merge.py"'), 'deny');
+  assert.strictEqual(bash('cat .oap/odoosh-browser/config.json; find /c -name x'), 'deny');
+  assert.strictEqual(bash('grep -rn "def write" /'), 'deny');
+  assert.strictEqual(decide('PowerShell', { command: 'Get-ChildItem C:\ -Recurse -Filter mail_thread.py' }), 'deny');
+  assert.strictEqual(bash('find . -iname "*.py" -path "*addons*"'), null);
+  assert.strictEqual(bash('find ~/src/odoo -name mail_thread.py'), null);
+  assert.strictEqual(bash('grep -rn "def write" addons/'), null);
+  assert.strictEqual(bash('ls -la /'), null);
+  assert.strictEqual(bash('find / -name x', { active: false }), null);
+});
+
+test('subagents cannot write run state or memory during a task', () => {
+  const sub = (command, opts = {}) => decideYolo('Bash', { command }, { agentId: 'a1', ...opts });
+  assert.strictEqual(sub('node "C:/p/scripts/run-state.js" evidence --kind remote_tests --status pass --detail x'), 'deny');
+  assert.strictEqual(sub('node "C:/p/scripts/oap.js" run-state.js state REMOTE_TESTING'), 'deny');
+  assert.strictEqual(sub('node "C:/p/scripts/oap.js" run-state close'), 'deny');
+  assert.strictEqual(sub('node "C:/p/scripts/oap.js" notes.js add --text x'), 'deny');
+  assert.strictEqual(sub('node "C:/p/scripts/run-state.js" show'), null);
+  assert.strictEqual(sub('node "C:/p/scripts/oap.js" notes show'), null);
+  assert.strictEqual(sub('node "C:/p/scripts/run-state.js" evidence --kind x', { active: false }), null);
+  assert.strictEqual(decideYolo('Bash', { command: 'node "C:/p/scripts/run-state.js" evidence --kind x' }, { yolo: false }), null);
+});

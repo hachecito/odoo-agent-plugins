@@ -74,7 +74,9 @@ Desarrollo local sin instalar, desde la raíz del repositorio: `claude --plugin-
 
 En **cualquier** nivel siguen preguntando: cambios de configuración, push a otras ramas, navegación a dominios no permitidos, `git remote`/`git config` de push y lo que el guard no sepa analizar. Siguen **denegados**: producción, force push, `--all` y similares, comandos peligrosos en el build y otros MCP de navegador. Las reglas de permisos `deny`/`ask` del `settings.json` del usuario también se respetan siempre (el hook no las puede saltar). Fuera de una tarea, `yolo` no aprueba nada.
 
-Durante una tarea, un **subagente** no puede hacer `git commit` ni `git push` (denegado): solo el hilo principal. Se detecta con el campo `agent_id` que Claude Code añade a los hooks de subagentes.
+Durante una tarea, un **subagente** no puede hacer `git commit` ni `git push` ni escribir el estado o la memoria con `run-state.js`/`notes.js` (denegado): solo el hilo principal. Se detecta con el campo `agent_id` que Claude Code añade a los hooks de subagentes.
+
+También se deniegan durante una tarea las búsquedas en todo el disco (`find /`, `Get-ChildItem C:\ -Recurse`…), que en Windows pueden tardar horas y dejar procesos colgados.
 
 Todo el estado del plugin vive en `.oap/` (Odoo Agent Plugins), en la raíz del repo:
 

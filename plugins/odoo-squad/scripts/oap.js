@@ -8,7 +8,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 // odoo-squad relies on .oap/, autonomy (yolo) and the subagent rules of this odoosh-browser version.
-const MIN_VERSION = '0.8.0';
+const MIN_VERSION = '0.8.2';
 
 /**
  * Read the version of a plugin folder.
@@ -73,7 +73,9 @@ function findScriptsDir(env, home, here) {
 
 /** Entry point. */
 function main() {
-  const [script, ...args] = process.argv.slice(2);
+  const [name, ...args] = process.argv.slice(2);
+  // "run-state" and "run-state.js" are the same script (the skills abbreviate the extension).
+  const script = name && !name.startsWith('-') && !name.endsWith('.js') ? `${name}.js` : name;
   const { dir, old } = locate();
   if (!dir) {
     console.error(old
@@ -86,7 +88,7 @@ function main() {
     return;
   }
   if (!/^[a-z-]+\.js$/.test(script || '') || !fs.existsSync(path.join(dir, script))) {
-    console.error('Uso: oap.js <run-state|notes|config|report|ssh-check>.js [args...]');
+    console.error('Uso: oap.js <run-state|notes|config|report|ssh-check>[.js] [args...]');
     process.exit(1);
   }
   const res = spawnSync(process.execPath, [path.join(dir, script), ...args], { stdio: 'inherit' });
