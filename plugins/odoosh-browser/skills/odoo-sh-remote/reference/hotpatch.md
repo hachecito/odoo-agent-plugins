@@ -35,7 +35,9 @@ Si `git status --porcelain` no sale vacío, otra persona o un parche anterior ha
 
 Abrir `https://<build>/odoo-sh/editor` y un terminal (*File → New → Terminal*). Leer [editor-jupyterlab.md](editor-jupyterlab.md) §5 para leer la salida del terminal (solo con capturas).
 
-**Opción A — terminal (preferente para varios archivos o cambios largos).** Escribir el contenido de `patch.b64` entre estas líneas:
+**Todo por el terminal**: tiene escritura en `~/src/user`, así que crear y modificar archivos con comandos (`mkdir -p`, `cat`/`base64 -d` con heredoc, `sed -i`) es más barato y fiable que el editor de archivos: no hay clics ni autoindentado, y el resultado se comprueba en el mismo terminal. Orden de preferencia: A, después B; el editor de archivos (C) solo si el terminal no está disponible.
+
+**Opción A — parche completo (preferente).** Escribir el contenido de `patch.b64` entre estas líneas:
 ```bash
 base64 -d > ~/oap-hotpatch.patch <<'OAP_EOF'
 <líneas de patch.b64>
@@ -45,7 +47,20 @@ git hash-object <archivos> | cut -c1-12
 ```
 Se usa base64 porque no lleva tabuladores (que el terminal tomaría como autocompletado) ni texto de código que el guard pueda confundir con un comando prohibido.
 
-**Opción B — editor de archivos (cambios pequeños o un archivo nuevo).**
+**Opción B — archivo a archivo en el terminal** (un archivo nuevo o un cambio pequeño, o si `git apply` falla). Con el contenido del archivo local:
+```bash
+mkdir -p ~/src/user/<modulo>/tests
+base64 -d > ~/src/user/<ruta> <<'OAP_EOF'      # contenido completo del archivo local en base64
+<base64 del archivo>
+OAP_EOF
+sed -i 's/<texto exacto>/<nuevo>/' ~/src/user/<ruta>   # solo para una línea sencilla
+cd ~/src/user && git hash-object <ruta> | cut -c1-12    # igual que el manifest
+```
+- Para el archivo completo, base64 mejor que texto plano: el código Python lleva sangrías y, a veces, tabuladores o texto (por ejemplo SQL en `cr.execute`) que el terminal o el guard interpretarían mal.
+- Nada de editores interactivos (`nano`, `vim`): se manejan a ciegas por capturas y no se puede comprobar lo escrito hasta salir.
+- **[no verificado]** si escribir un `.py` desde el terminal reinicia el servidor como al guardar en el editor. Para los tests no importa: se lanzan en un proceso aparte.
+
+**Opción C — editor de archivos (último recurso).**
 1. Abrir el archivo con `https://<build>/odoo-sh/editor/lab/tree/src/user/<ruta>`. Archivo nuevo: navegar a su carpeta, *File → New → Text File* (o *Python File*) y renombrarlo con su nombre real (clic derecho en la pestaña o en el explorador → *Rename*).
 2. Editar. **[no verificado]** el editor puede autoindentar y cerrar paréntesis o comillas al escribir: revisar el resultado antes de guardar.
 3. **Guardar siempre**: `Ctrl+S` o *File → Save*. Sin guardar, el cambio no existe en disco y el test probaría el código anterior. Guardar un `.py` reinicia el servidor de staging.
@@ -67,4 +82,4 @@ Registrar `hotpatch_tests` con el SHA base, el parche (`--only` o completo), el 
 ```bash
 cd ~/src/user && git apply -R ~/oap-hotpatch.patch && git status --porcelain && rm ~/oap-hotpatch.patch
 ```
-Por SSH, el mismo comando dentro de `ssh <build> "..."`. Si se editó en el editor sin parche, `git checkout -- <archivos>` y borrar los archivos nuevos con `rm <archivo>` (sin `-rf`). Antes de un parche nuevo, deshacer el anterior.
+Por SSH, el mismo comando dentro de `ssh <build> "..."`. Si se cambiaron archivos uno a uno (opciones B o C) sin parche, `git checkout -- <archivos>` y borrar los archivos nuevos con `rm <archivo>` (sin `-rf`). Antes de un parche nuevo, deshacer el anterior.

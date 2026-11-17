@@ -90,13 +90,13 @@ grep -n 'FAIL:\|ERROR:\|tests.result' /tmp/agent-tests.log | tail -n 40
 La documentación avisa: estas operaciones **no están aisladas** y se reflejan en la base de datos. Solo en staging o desarrollo, nunca en producción.
 
 ### Crear o editar un archivo (prueba rápida con parche)
-Solo en `src/user` del build staging; procedimiento completo en [hotpatch.md](hotpatch.md). Resumen:
+Solo en `src/user` del build staging; procedimiento completo en [hotpatch.md](hotpatch.md). **Preferir el terminal**: tiene escritura en `src/user` y crear o cambiar archivos con `mkdir -p`, `base64 -d > <archivo> <<'OAP_EOF'` o `sed -i` es más barato y fiable que el editor de archivos (sin clics ni autoindentado). Nada de `nano` ni `vim`. El editor de archivos, solo como último recurso:
 1. Abrir el archivo por URL (`/odoo-sh/editor/lab/tree/src/user/<ruta>`). Archivo nuevo: ir a su carpeta en el explorador, *File → New → Text File* (o *Python File*) y renombrarlo (*Rename*) con su nombre real.
 2. Editar. **[no verificado]** el editor puede autoindentar o cerrar paréntesis y comillas al escribir: revisar antes de guardar.
 3. **Guardar siempre** con `Ctrl+S` o *File → Save*: sin guardar, el cambio no está en disco y los tests usan el código anterior.
 4. Comprobar en el terminal que el archivo guardado es igual al local: `git hash-object <archivo> | cut -c1-12` contra el `manifest.json` del parche.
 
-Para varios archivos o cambios largos es más fiable escribir el parche en base64 en el terminal (opción A de [hotpatch.md](hotpatch.md)).
+Para varios archivos, el parche completo en base64 en el terminal (opción A de [hotpatch.md](hotpatch.md)).
 
 ### Correos en staging
 Los correos salientes de staging se interceptan con un *mail catcher*; el proyecto de Odoo.sh tiene una interfaz para verlos. Útil para comprobaciones funcionales.
