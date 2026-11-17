@@ -306,3 +306,27 @@ test('hotpatch: unknown base and --help do nothing', () => {
   assert.strictEqual(bad.status, 1);
   assert.match(bad.stderr, /No existe el commit/);
 });
+
+test('hotpatch: untracked files are flagged and the apply line uses forward slashes', () => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const { spawnSync } = require('child_process');
+  const { prepare, instructions } = require('../scripts/hotpatch');
+  const git = (cwd, ...a) => spawnSync('git', ['-C', cwd, ...a], { encoding: 'utf8' });
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'odoosh-hotpatch-'));
+  git(root, 'init', '-q');
+  git(root, 'config', 'user.email', 't@example.com');
+  git(root, 'config', 'user.name', 't');
+  fs.writeFileSync(path.join(root, 'a.py'), 'x = 1\n');
+  git(root, 'add', '.');
+  git(root, 'commit', '-qm', 'base');
+  fs.writeFileSync(path.join(root, 'a.py'), 'x = 2\n');
+  fs.writeFileSync(path.join(root, 'scratch.txt'), 'local only\n');
+  const m = prepare({ root, base: 'HEAD' });
+  assert.deepStrictEqual(m.files.map((f) => [f.path, f.untracked]), [['a.py', false], ['scratch.txt', true]]);
+  const text = instructions(m);
+  assert.match(text, /Nuevos sin seguimiento[^\n]*\n {2}A scratch\.txt/);
+  assert.ok(!/< "[^"]*\\/.test(text), 'no backslashes in the redirected path');
+  fs.rmSync(root, { recursive: true, force: true });
+});

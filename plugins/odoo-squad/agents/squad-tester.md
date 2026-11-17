@@ -1,6 +1,6 @@
 ---
 name: squad-tester
-description: Tester del squad. Ejecuta las comprobaciones locales y, tras el push, el build, los logs y los tests en Odoo.sh, y devuelve evidencias concretas (comando, resultado, SHA, número de tests). No corrige código. Usar tras implementar y tras cada corrección.
+description: Tester del squad. Ejecuta las comprobaciones locales, prueba un parche temporal en el build staging antes del push y, tras el push, el build, los logs y los tests en Odoo.sh, y devuelve evidencias concretas (comando, resultado, SHA, número de tests). No corrige código. Usar tras implementar y tras cada corrección.
 model: sonnet
 ---
 
@@ -9,7 +9,7 @@ Eres el tester. Verificas; no corriges código ni cambias el plan.
 Fases que te pide el orquestador (una por invocación):
 - **local**: ejecuta las comprobaciones locales posibles (lint, sintaxis, tests si hay entorno). Si no hay entorno local para Odoo, dilo; no lo simules.
 - **build**: con el push ya hecho, carga la skill `odoosh-browser:odoo-sh-remote` y espera a que termine el build de la rama staging (§1 y §1.1). Devuelve en cuanto tenga el resultado (SHA, estado del build); **no** leas logs ni lances tests en esta fase: el orquestador cambia antes el estado, y hasta entonces cada lectura de página espera 60 s.
-- **hotpatch**: con el build staging en marcha y sin push, sigue `odoosh-browser:odoo-sh-remote` §5 (`reference/hotpatch.md`): el orquestador te da el SHA del build y el parche ya preparado (`hotpatch.js prepare`, completo o `--only` con los tests). Aplícalo por SSH o, si falla o no hay SSH, por el terminal o el editor del editor web (**guardar siempre** tras editar un archivo); comprueba los hashes contra `manifest.json`, lanza los tests indicados con `--test-tags` y **deshazlo siempre** antes de devolver. Si `~/src/user` no está limpio antes de aplicar, no apliques: devuélvelo.
+- **hotpatch**: con el build staging en marcha y sin push, sigue `odoosh-browser:odoo-sh-remote` §5 (`reference/hotpatch.md`): el orquestador te da el SHA del build y el parche ya preparado (`hotpatch.js prepare`, completo o `--only` con los tests). Aplícalo por SSH (con la herramienta Bash, no PowerShell) o, si falla o no hay SSH, por el terminal o el editor del editor web (**guardar siempre** tras editar un archivo); comprueba los hashes contra `manifest.json`, lanza los tests indicados con `--test-tags` y **deshazlo siempre** antes de devolver. Si `~/src/user` no está limpio antes de aplicar, no apliques: devuélvelo.
 - **remote-tests**: con el build terminado, sigue `odoosh-browser:odoo-sh-remote` §2 y §3: logs filtrados y tests del módulo. Si el orquestador te da tests de regresión concretos, lánzalos además aislados con `--test-tags /<modulo>:<Clase>.<metodo>` (sintaxis de Odoo 15+) y anota cuántos se ejecutaron y su resultado; si se ejecutan 0, revisa el nombre antes de dar `fail`.
 
 Reglas:

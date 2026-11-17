@@ -27,7 +27,7 @@ function git(root, args, env = process.env) {
 /**
  * Write the patch, its base64 copy and the manifest of the changes against the build commit.
  * @param {{root: string, base: string, only?: string[]}} opts - repo root, build commit, optional paths
- * @returns {{base: string, files: Array<{path: string, status: string, hash: string|null}>, bytes: number, dir: string}} manifest
+ * @returns {{base: string, files: Array<{path: string, status: string, hash: string|null, untracked: boolean}>, bytes: number, dir: string}} manifest
  */
 function prepare({ root, base, only = [] }) {
   const rb = git(root, ['rev-parse', '--verify', '--quiet', `${base}^{commit}`]);
@@ -44,6 +44,8 @@ function prepare({ root, base, only = [] }) {
   const tmpIndex = path.resolve(root, git(root, ['rev-parse', '--git-path', 'oap-hotpatch.index']).stdout.trim());
   if (fs.existsSync(realIndex)) fs.copyFileSync(realIndex, tmpIndex);
   const env = { ...process.env, GIT_INDEX_FILE: tmpIndex };
+  // Files git does not track yet: listed apart, because they may be scratch files or local config.
+  const untracked = new Set(git(root, ['ls-files', '--others', '--exclude-standard', '--', ...scope]).stdout.split('\n').filter(Boolean));
   let diff;
   let names;
   try {
@@ -56,7 +58,7 @@ function prepare({ root, base, only = [] }) {
   if (diff.status !== 0) throw new Error(diff.stderr.trim() || 'git diff falló');
   const files = names.stdout.split('\n').filter(Boolean).map((line) => {
     const [status, file] = line.split('\t');
-    return { path: file, status: status[0], hash: null };
+    return { path: file, status: status[0], hash: null, untracked: untracked.has(file) };
   });
   if (!files.length) throw new Error(`No hay cambios respecto a ${sha.slice(0, 12)}.`);
   const present = files.filter((f) => f.status !== 'D');
@@ -79,12 +81,16 @@ function prepare({ root, base, only = [] }) {
  */
 function instructions(m) {
   const present = m.files.filter((f) => f.status !== 'D').map((f) => f.path).join(' ');
-  const patch = path.join(m.dir, 'patch.diff');
+  // Forward slashes: the apply line runs in Git Bash (PowerShell 5.1 has no `<` input redirection).
+  const patch = path.join(m.dir, 'patch.diff').replace(/\\/g, '/');
+  const row = (f) => `  ${f.status} ${f.path}${f.hash ? '  ' + f.hash.slice(0, 12) : '  (borrado)'}`;
+  const fresh = m.files.filter((f) => f.untracked);
   const lines = [
     `Parche: ${m.files.length} archivo(s), ${m.bytes} bytes, base ${m.base.slice(0, 12)}.`,
-    ...m.files.map((f) => `  ${f.status} ${f.path}${f.hash ? '  ' + f.hash.slice(0, 12) : '  (borrado)'}`),
+    ...m.files.filter((f) => !f.untracked).map(row),
+    ...(fresh.length ? ['Nuevos sin seguimiento en git (revisar: solo deben ir los de la tarea; si sobra alguno, repetir con --only <módulos>):', ...fresh.map(row)] : []),
     '',
-    'SSH (preferente). Antes, el build debe correr la base y ~/src/user estar limpio:',
+    'SSH (preferente; con la herramienta Bash, no PowerShell). Antes, el build debe correr la base y ~/src/user estar limpio:',
     '  ssh <build> "cd ~/src/user && git rev-parse HEAD && git status --porcelain"',
     `  ssh <build> "cat > ${REMOTE_PATCH} && cd ~/src/user && git apply --check ${REMOTE_PATCH} && git apply ${REMOTE_PATCH}" < "${patch}"`,
     present ? `  ssh <build> "cd ~/src/user && git hash-object ${present} | cut -c1-12"` : '',

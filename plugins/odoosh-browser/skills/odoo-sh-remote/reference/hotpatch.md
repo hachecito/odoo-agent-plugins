@@ -9,20 +9,21 @@ Probar un cambio en el build staging que ya está en marcha, sin commit ni push 
 - **Staging es compartido**: el `-u` de los tests cambia su base de datos y guardar un `.py` en el editor reinicia el servidor. Avisar al usuario la primera vez en cada tarea.
 - **Deshacer siempre**: antes del push y al cerrar la tarea (completada, bloqueada o abandonada). El siguiente build lo descarta, pero mientras tanto staging ejecuta código que no está en git.
 - Evidencia propia: `run-state.js evidence --kind hotpatch_tests ...`. Nunca registrarla como `remote_tests`.
-- **[no verificado]** que `~/src/user` sea un checkout de git con permisos de escritura. Comprobarlo en el primer uso (`git -C ~/src/user rev-parse HEAD`) y anotarlo en la memoria. `git apply` funciona también fuera de un repositorio; sin `.git` no hay `git status` para ver si está limpio.
+- **[no verificado]** que `~/src/user` sea un checkout de git con permisos de escritura. Comprobarlo en el primer uso (`git -C ~/src/user rev-parse HEAD`) y anotarlo en la memoria. `git apply` funciona también fuera de un repositorio; sin `.git`, en vez de `git status` se comprueba con el propio parche: `git apply -R --check ~/oap-hotpatch.patch` termina bien si el parche **sigue aplicado**, y si no queda `~/oap-hotpatch.patch` no hay parche del agente.
 
 ## 1. Preparar el parche (local)
 
-1. SHA del build: `git -C ~/src/user rev-parse HEAD` por SSH o en el terminal del editor, o el commit que muestra la rama en Odoo.sh. Si no existe en local, `git fetch`.
+1. SHA del build: `git -C ~/src/user rev-parse --short=12 HEAD` por SSH o en el terminal del editor (12 caracteres se leen mejor en una captura), o el commit que muestra la rama en Odoo.sh. Si no existe en local, `git fetch`.
 2. `node <plugin>/scripts/hotpatch.js prepare --base <sha>` (añadir `--only <ruta>` para un parche parcial, por ejemplo solo los tests). Genera en `.oap/odoosh-browser/hotpatch/`:
    - `patch.diff`: commits locales sin subir, cambios sin commit y archivos nuevos respecto al build;
    - `patch.b64`: el mismo parche en base64, para escribirlo en el terminal web;
    - `manifest.json`: archivos y su `git hash-object`.
    Imprime los comandos exactos para SSH y para el editor. No se conecta al build.
+3. **Revisar la lista de archivos antes de aplicar.** El parche completo incluye todo lo que git no ignora, también archivos sueltos sin seguimiento (scripts de prueba, un `odoo.conf`, `.env`…), que el script lista aparte. Si aparece algo fuera de los módulos de la tarea, repetir con `--only <modulo> [--only <modulo>...]`. Nunca llevar al build archivos con credenciales o datos de clientes.
 
 ## 2a. Aplicar por SSH (preferente)
 
-Con `ssh.enabled` y el host del build:
+Con `ssh.enabled` y el host del build. En Windows, con la herramienta **Bash** (Git Bash): PowerShell 5.1 no admite la redirección `<` y pasar el parche por una tubería de PowerShell lo recodifica y lo estropea.
 ```bash
 ssh <build> "cd ~/src/user && git rev-parse HEAD && git status --porcelain"     # HEAD = base; sin cambios ajenos
 ssh <build> "cat > ~/oap-hotpatch.patch && cd ~/src/user && git apply --check ~/oap-hotpatch.patch && git apply ~/oap-hotpatch.patch" < .oap/odoosh-browser/hotpatch/patch.diff
@@ -57,7 +58,7 @@ Con el parche aplicado, lanzar los tests en un proceso aparte, como en [tests.md
 odoo-bin -d "$PGDATABASE" -u <modulo> --stop-after-init --no-http --test-enable --test-tags /<modulo>:<Clase>.<metodo> --logfile=/tmp/agent-tests.log --log-level=test
 grep -n 'FAIL:\|ERROR:\|tests.result\|Ran ' /tmp/agent-tests.log | tail -n 40
 ```
-Para un test de regresión: primero un parche solo con el test (`--only <ruta del test>`) y debe **fallar**; después deshacer, preparar el parche completo y debe **pasar**.
+Para un test de regresión: primero un parche solo con la carpeta de tests del módulo (`--only <modulo>/tests`, para que vaya también `tests/__init__.py`) y debe **fallar**; después deshacer, preparar el parche completo y debe **pasar**. Solo cuenta como rojo si se ejecutan N > 0 tests y el de regresión falla en su aserción; 0 tests, un `ImportError` o un error al cargar el módulo no reproducen nada.
 
 Registrar `hotpatch_tests` con el SHA base, el parche (`--only` o completo), el comando, N tests y el resultado.
 

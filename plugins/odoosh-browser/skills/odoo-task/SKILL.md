@@ -57,7 +57,7 @@ Scripts (rutas absolutas): `node "${CLAUDE_PLUGIN_ROOT}/scripts/<script>.js"`. A
 - Ante un fallo: evidencia con `--status fail`, analizar, corregir y `run-state.js cycle` antes de volver a la fase 3. Para comprobar la corrección sin esperar otro build, se puede probar antes con un parche en el build staging (`odoosh-browser:odoo-sh-remote` §5, evidencia `hotpatch_tests`); el ciclo commit → push sigue siendo obligatorio. Al superar 3 ciclos el estado pasa a BLOCKED: pedir ayuda.
 
 ### 9. FINAL_VERIFICATION
-Si se aplicó un parche de prueba en el build (`odoo-sh-remote` §5), comprobar que está deshecho (`git status --porcelain` vacío en `~/src/user`). Hacerlo también antes de cada push y si la tarea se cierra bloqueada o abandonada.
+Si se aplicó un parche de prueba en el build (`odoo-sh-remote` §5), comprobar que está deshecho (`git status --porcelain` vacío en `~/src/user`; si no es un checkout de git, que no quede `~/oap-hotpatch.patch`, ver `reference/hotpatch.md`). Hacerlo también antes de cada push y si la tarea se cierra bloqueada o abandonada.
 
 1. `run-state.js state FINAL_VERIFICATION`.
 2. Lanzar el subagente `odoo-verifier` para que revise el diff y las evidencias.
