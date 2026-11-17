@@ -8,7 +8,7 @@ Fuentes: documentación oficial de Odoo.sh 17.0 (*Online editor*, *Advanced → 
 
 - URL: `https://<build_domain>/odoo-sh/editor` (ejemplo oficial: `https://odoo-addons-master-1.dev.odoo.com/odoo-sh/editor`). También desde la pestaña *Branches* o el desplegable del build en Odoo.sh.
 - Usa la sesión de Odoo.sh del navegador. Si pide login, detenerse y pedir al usuario que inicie sesión.
-- En **producción el código es de solo lectura**. En desarrollo y staging se puede editar, pero **este agente no edita en el editor** (ver §6).
+- En **producción el código es de solo lectura**. En desarrollo y staging se puede editar; este agente solo edita `src/user` del build staging para la prueba rápida con parche ([hotpatch.md](hotpatch.md)), y siempre la deshace (ver §6).
 
 ## 2. Estructura de directorios (raíz del explorador = `/home/odoo`)
 
@@ -46,14 +46,14 @@ JupyterLab abre archivos y carpetas por URL con `/lab/tree/<ruta>`; en Odoo.sh e
 
 Rutas `logs`, `src/user`, `src/odoo` y `src/enterprise` confirmadas por el usuario; el patrón `/lab/tree/<ruta>` es de la documentación de JupyterLab.
 
-**[no verificado] Lectura por API**: Jupyter Server expone `GET /api/contents/<ruta>?content=1&format=text`, que devuelve JSON con el campo `content`. En Odoo.sh sería `https://<build>/odoo-sh/editor/api/contents/logs/odoo.log?content=1&format=text`. Devuelve el archivo **entero**: usarla solo para archivos pequeños (por ejemplo una salida ya filtrada en `~/agent-out.txt`), **nunca para logs**. Solo `GET`: está prohibido escribir por API.
+**[no verificado] Lectura por API**: Jupyter Server expone `GET /api/contents/<ruta>?content=1&format=text`, que devuelve JSON con el campo `content`. En Odoo.sh sería `https://<build>/odoo-sh/editor/api/contents/logs/odoo.log?content=1&format=text`. Devuelve el archivo **entero**: usarla solo para archivos pequeños (por ejemplo una salida ya filtrada en `~/agent-out.txt`), **nunca para logs**. Solo `GET`: está prohibido escribir por API (los archivos se cambian con el parche o el editor, ver §5).
 
 ## 4. Interfaz
 
 - **Barra lateral izquierda**: explorador de archivos (doble clic abre un archivo).
 - **Menú superior**: *File, Edit, View, Run, Kernel, Tabs, Settings, Help* y un menú **Odoo** con *Update current module* (actualiza el módulo del archivo abierto).
 - **Nuevo terminal**: *File → New → Terminal*.
-- **Consolas**: Python (IPython) y **consola Odoo shell** (con `env`, por ejemplo `env['res.users']`). **En la consola Odoo shell las transacciones se confirman automáticamente**: cualquier escritura queda en la base de datos.
+- **Consolas**: Python (IPython) y **consola Odoo shell** (con `env`, por ejemplo `env['res.users']`). El editor puede abrirse directamente con una consola Odoo shell abierta: **no escribir en ella**; abrir un terminal (*File → New → Terminal*). La documentación dice que sus transacciones se confirman solas, pero la consola de un build de Odoo 18 avisa de lo contrario (pide `env.cr.commit()` y advierte que una transacción abierta puede bloquear la base). En ambos casos, es para lectura: el agente no escribe ahí.
 - Guardar: *File → Save* o `Ctrl+S`. Guardar un `.py` del addons path **recarga el servidor automáticamente**.
 
 ## 5. Procedimientos para el agente
@@ -89,6 +89,15 @@ grep -n 'FAIL:\|ERROR:\|tests.result' /tmp/agent-tests.log | tail -n 40
 ```
 La documentación avisa: estas operaciones **no están aisladas** y se reflejan en la base de datos. Solo en staging o desarrollo, nunca en producción.
 
+### Crear o editar un archivo (prueba rápida con parche)
+Solo en `src/user` del build staging; procedimiento completo en [hotpatch.md](hotpatch.md). **Preferir el terminal**: tiene escritura en `src/user` y crear o cambiar archivos con `mkdir -p`, `base64 -d > <archivo> <<'OAP_EOF'` o `sed -i` es más barato y fiable que el editor de archivos (sin clics ni autoindentado). Nada de `nano` ni `vim`. El editor de archivos, solo como último recurso:
+1. Abrir el archivo por URL (`/odoo-sh/editor/lab/tree/src/user/<ruta>`). Archivo nuevo: ir a su carpeta en el explorador, *File → New → Text File* (o *Python File*) y renombrarlo (*Rename*) con su nombre real.
+2. Editar. **[no verificado]** el editor puede autoindentar o cerrar paréntesis y comillas al escribir: revisar antes de guardar.
+3. **Guardar siempre** con `Ctrl+S` o *File → Save*: sin guardar, el cambio no está en disco y los tests usan el código anterior.
+4. Comprobar en el terminal que el archivo guardado es igual al local: `git hash-object <archivo> | cut -c1-12` contra el `manifest.json` del parche.
+
+Para varios archivos, el parche completo en base64 en el terminal (opción A de [hotpatch.md](hotpatch.md)).
+
 ### Correos en staging
 Los correos salientes de staging se interceptan con un *mail catcher*; el proyecto de Odoo.sh tiene una interfaz para verlos. Útil para comprobaciones funcionales.
 
@@ -96,7 +105,7 @@ Los correos salientes de staging se interceptan con un *mail catcher*; el proyec
 
 | Acción | Motivo |
 |---|---|
-| Editar o guardar archivos de `src/` | Los cambios no persisten en nuevos builds y no pasan por git ni por el hook; guardar un `.py` reinicia el servidor. Los cambios se hacen en local y se suben con push a staging |
+| Editar `src/odoo`, `src/enterprise` o `src/user` fuera de la prueba rápida con parche | Los cambios no persisten en nuevos builds y no pasan por git; guardar un `.py` reinicia el servidor. Los cambios se hacen en local; en el build solo se prueban con [hotpatch.md](hotpatch.md), que se deshace siempre |
 | `git push` / `odoosh-push` desde el terminal | La documentación lo describe como flujo válido, pero salta las salvaguardas del plugin. El hook lo bloquea |
 | Escribir con la consola Odoo shell | Las transacciones se confirman solas |
 | SQL de escritura en `psql` | Bloqueado por el hook |

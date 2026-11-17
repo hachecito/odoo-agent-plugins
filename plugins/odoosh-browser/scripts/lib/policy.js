@@ -25,7 +25,7 @@ const PROTECTED_PATH = /(\.oap[\\/](memory\.md|odoosh-browser[\\/]config\.json)|
 // Programs that write, copy, move or delete the file named in their arguments.
 const WRITER_PROGRAMS = new Set(['tee', 'cp', 'mv', 'rm', 'del', 'copy', 'move', 'set-content', 'add-content', 'out-file', 'copy-item', 'move-item', 'remove-item', 'new-item', 'sc', 'ac', 'ni']);
 // Yolo mode: these scripts of the Odoo agent plugins run without a prompt, only from a real plugin root (see trustedRoots).
-const YOLO_SCRIPTS = new Set(['run-state.js', 'notes.js', 'report.js', 'ssh-check.js', 'config.js', 'oap.js', 'tasks.js']);
+const YOLO_SCRIPTS = new Set(['run-state.js', 'notes.js', 'report.js', 'ssh-check.js', 'config.js', 'oap.js', 'tasks.js', 'hotpatch.js']);
 let trustedRootsCache = null;
 
 /**

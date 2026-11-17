@@ -37,6 +37,7 @@ Política durante una tarea:
 
 ## Límites conocidos (no se prometen como controles técnicos)
 
+- **Parche de prueba en el build** (`odoo-sh-remote` §5): el agente puede aplicar sus cambios locales en `~/src/user` del build staging (por SSH con `git apply` o desde el editor web) para lanzar tests sin push. Es regla de skill, no control del hook: el hook solo sigue aplicando la lista de comandos remotos denegados y el bloqueo de producción. Staging es compartido: el `-u` cambia su base de datos y guardar un `.py` reinicia el servidor. El parche se deshace antes del push y al cerrar, y su evidencia (`hotpatch_tests`) no cuenta para el veredicto.
 - La interfaz de Odoo.sh es de solo lectura para el agente por regla de skill; un hook no distingue un clic inocuo de uno peligroso (arrastrar una rama a producción, *Rebuild*, backups).
 - El análisis de comandos es heurístico: comandos ofuscados (variables, alias, scripts generados) pueden escapar. Por eso el push a staging siempre pide confirmación.
 - El estado de ejecución (`.oap/odoosh-browser/run.json`) lo escribe el propio agente; el subagente verificador y el informe ayudan, pero no sustituyen la revisión humana.
@@ -59,7 +60,7 @@ Opcional y por proyecto, desactivado por defecto (`confirm`). Cambiarlo con `con
 - **`yolo`**: el guard responde `allow` (sin pregunta) a:
   - las confirmaciones que marca como seguras: push a staging, incluido con tags, y JavaScript en Chrome en dominios permitidos;
   - las herramientas de Claude in Chrome sin otra regla;
-  - una lista cerrada de scripts propios (`run-state`, `notes`, `report`, `ssh-check`, `config`, `oap`, `tasks`), solo si están en la carpeta real de `odoosh-browser` u `odoo-squad` (la del propio guard, su hermana o la instalación del marketplace) y sin redirecciones a archivos. Una carpeta con el mismo nombre dentro del repo no cuenta;
+  - una lista cerrada de scripts propios (`run-state`, `notes`, `report`, `ssh-check`, `config`, `oap`, `tasks`, `hotpatch`), solo si están en la carpeta real de `odoosh-browser` u `odoo-squad` (la del propio guard, su hermana o la instalación del marketplace) y sin redirecciones a archivos. Una carpeta con el mismo nombre dentro del repo no cuenta;
   - `ssh` a `*.dev.odoo.com`, combinado en local solo con filtros (`grep`, `tail`, `head`, `wc`, `sort`…). El comando **remoto** puede ser cualquiera que no esté en la lista denegada (`odoosh-push`, `git push`, `rm -rf`, SQL de escritura): por ejemplo `odoo-bin --test-enable`, que escribe en la base de staging.
 - **En cualquier nivel siguen preguntando**:
   - la configuración del plugin y `memory.md`;
