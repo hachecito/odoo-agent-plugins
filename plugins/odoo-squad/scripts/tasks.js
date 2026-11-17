@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const STATUSES = ['en-curso', 'completada', 'bloqueada', 'abandonada', 'migrada'];
-const INDEX_HEADER = '# Tareas del squad\n\nUna línea por tarea: id · estado · título. La carpeta de cada tarea guarda task.md, plan.md y hallazgos.md.\n\n';
+const INDEX_HEADER = '# Tareas del squad\n\nUna línea por tarea: id · estado · título. La carpeta de cada tarea guarda task.md, aclaraciones.md, plan.md y hallazgos.md.\n\n';
 const LINE_RE = /^- (\S+) · (\S+) · (.*)$/;
 const FINDINGS_HEADER = '# Hallazgos de la tarea\n\nDetalles que solo valen para esta tarea. Lo reutilizable va a .oap/memory.md.\n\n';
 
