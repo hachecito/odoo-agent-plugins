@@ -9,7 +9,7 @@ Probar un cambio en el build staging que ya está en marcha, sin commit ni push 
 - **Staging es compartido**: el `-u` de los tests cambia su base de datos y guardar un `.py` en el editor reinicia el servidor. Avisar al usuario la primera vez en cada tarea.
 - **Deshacer siempre**: antes del push y al cerrar la tarea (completada, bloqueada o abandonada). El siguiente build lo descarta, pero mientras tanto staging ejecuta código que no está en git.
 - Evidencia propia: `run-state.js evidence --kind hotpatch_tests ...`. Nunca registrarla como `remote_tests`.
-- **[no verificado]** que `~/src/user` sea un checkout de git con permisos de escritura. Comprobarlo en el primer uso (`git -C ~/src/user rev-parse HEAD`) y anotarlo en la memoria. `git apply` funciona también fuera de un repositorio; sin `.git`, en vez de `git status` se comprueba con el propio parche: `git apply -R --check ~/oap-hotpatch.patch` termina bien si el parche **sigue aplicado**, y si no queda `~/oap-hotpatch.patch` no hay parche del agente.
+- **Verificado en un build staging de Odoo 18 (noviembre de 2026)**: `~/src/user` es un checkout de git en el commit del build, con permisos de escritura, `git` 2.43 y `base64`; el parche en base64 escrito en el terminal web se aplicó con los mismos `git hash-object` que en local, y `git apply -R` lo deshizo por completo, incluidos los archivos y carpetas nuevos. Comprobarlo igualmente en el primer uso de cada proyecto (`git -C ~/src/user rev-parse HEAD`). Si algún build no fuera un checkout de git: `git apply` funciona también fuera de un repositorio, y en vez de `git status` se comprueba con el propio parche: `git apply -R --check ~/oap-hotpatch.patch` termina bien si el parche **sigue aplicado**, y si no queda `~/oap-hotpatch.patch` no hay parche del agente.
 
 ## 1. Preparar el parche (local)
 
@@ -47,7 +47,7 @@ git hash-object <archivos> | cut -c1-12
 ```
 Se usa base64 porque no lleva tabuladores (que el terminal tomaría como autocompletado) ni texto de código que el guard pueda confundir con un comando prohibido.
 
-**Opción B — archivo a archivo en el terminal** (un archivo nuevo o un cambio pequeño, o si `git apply` falla). Con el contenido del archivo local:
+**Opción B — archivo a archivo en el terminal** (un archivo nuevo o un cambio pequeño, o si `git apply` falla). Verificado: un archivo escrito con `base64 -d` conserva los tabuladores y `sed -i` cambia la línea; el hash coincide con el local. Con el contenido del archivo local:
 ```bash
 mkdir -p ~/src/user/<modulo>/tests
 base64 -d > ~/src/user/<ruta> <<'OAP_EOF'      # contenido completo del archivo local en base64

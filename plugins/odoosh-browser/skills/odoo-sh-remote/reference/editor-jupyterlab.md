@@ -53,7 +53,7 @@ Rutas `logs`, `src/user`, `src/odoo` y `src/enterprise` confirmadas por el usuar
 - **Barra lateral izquierda**: explorador de archivos (doble clic abre un archivo).
 - **Menú superior**: *File, Edit, View, Run, Kernel, Tabs, Settings, Help* y un menú **Odoo** con *Update current module* (actualiza el módulo del archivo abierto).
 - **Nuevo terminal**: *File → New → Terminal*.
-- **Consolas**: Python (IPython) y **consola Odoo shell** (con `env`, por ejemplo `env['res.users']`). **En la consola Odoo shell las transacciones se confirman automáticamente**: cualquier escritura queda en la base de datos.
+- **Consolas**: Python (IPython) y **consola Odoo shell** (con `env`, por ejemplo `env['res.users']`). El editor puede abrirse directamente con una consola Odoo shell abierta: **no escribir en ella**; abrir un terminal (*File → New → Terminal*). La documentación dice que sus transacciones se confirman solas, pero la consola de un build de Odoo 18 avisa de lo contrario (pide `env.cr.commit()` y advierte que una transacción abierta puede bloquear la base). En ambos casos, es para lectura: el agente no escribe ahí.
 - Guardar: *File → Save* o `Ctrl+S`. Guardar un `.py` del addons path **recarga el servidor automáticamente**.
 
 ## 5. Procedimientos para el agente
