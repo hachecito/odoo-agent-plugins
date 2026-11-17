@@ -294,3 +294,14 @@ test('subagents cannot write run state or memory during a task', () => {
   assert.strictEqual(sub('node "C:/p/scripts/run-state.js" evidence --kind x', { active: false }), null);
   assert.strictEqual(decideYolo('Bash', { command: 'node "C:/p/scripts/run-state.js" evidence --kind x' }, { yolo: false }), null);
 });
+
+test('hotpatch on a staging build is allowed, on production it is denied', () => {
+  const p = require('../scripts/lib/policy');
+  const ctx = { dir: process.cwd(), loadConfig: () => ({ root: '/r', config: { staging_branch: 'stg', production_branches: ['main'] } }), runActive: () => true, branchOf: () => 'stg' };
+  const apply = 'ssh 1@proj-stg-1.dev.odoo.com "cat > ~/oap-hotpatch.patch && cd ~/src/user && git apply ~/oap-hotpatch.patch" < .oap/odoosh-browser/hotpatch/patch.diff';
+  const revert = 'ssh 1@proj-stg-1.dev.odoo.com "cd ~/src/user && git apply -R ~/oap-hotpatch.patch && rm ~/oap-hotpatch.patch"';
+  assert.strictEqual(p.evaluateCommand(apply, ctx), null);
+  assert.strictEqual(p.evaluateCommand(revert, ctx), null);
+  assert.strictEqual(p.evaluateCommand('ssh 1@proj.odoo.com "cd ~/src/user && git apply x"', ctx).decision, p.DENY);
+  assert.strictEqual(p.evaluateCommand('ssh 1@proj-stg-1.dev.odoo.com "cd ~/src/user && git apply x && git push"', ctx).decision, p.DENY);
+});

@@ -248,3 +248,61 @@ test('run-state: --help never acts and close is idempotent', () => {
   assert.strictEqual(read().history.filter((h) => /cerrada/.test(h.note || '')).length, 1);
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+test('hotpatch: patch against the build commit reproduces local files on a clean checkout', () => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const { spawnSync } = require('child_process');
+  const { prepare } = require('../scripts/hotpatch');
+  const git = (cwd, ...a) => spawnSync('git', ['-C', cwd, ...a], { encoding: 'utf8' });
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'odoosh-hotpatch-'));
+  git(root, 'init', '-q');
+  git(root, 'config', 'user.email', 't@example.com');
+  git(root, 'config', 'user.name', 't');
+  fs.mkdirSync(path.join(root, 'mod', 'tests'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'mod', 'a.py'), 'x = 1\n');
+  fs.writeFileSync(path.join(root, 'mod', 'old.py'), 'gone = True\n');
+  git(root, 'add', '.');
+  git(root, 'commit', '-qm', 'base');
+  const base = git(root, 'rev-parse', 'HEAD').stdout.trim();
+  // An unpushed local commit plus uncommitted, new and deleted files all belong to the patch.
+  fs.writeFileSync(path.join(root, 'mod', 'a.py'), 'x = 2\n');
+  git(root, 'commit', '-qam', 'local');
+  fs.appendFileSync(path.join(root, 'mod', 'a.py'), 'y = 3\n');
+  git(root, 'config', 'core.autocrlf', 'true');
+  fs.writeFileSync(path.join(root, 'mod', 'tests', 'test_a.py'), 'def test():\r\n    assert True\r\n');
+  fs.rmSync(path.join(root, 'mod', 'old.py'));
+  const m = prepare({ root, base });
+  assert.deepStrictEqual(m.files.map((f) => f.status + ' ' + f.path).sort(), ['D mod/old.py', 'M mod/a.py', 'A mod/tests/test_a.py'].sort());
+  assert.strictEqual(git(root, 'status', '--porcelain', '--', 'mod/tests').stdout.trim(), '?? mod/tests/', 'intent-to-add entry removed');
+  const only = prepare({ root, base, only: ['mod/tests'] });
+  assert.deepStrictEqual(only.files.map((f) => f.path), ['mod/tests/test_a.py']);
+  // Fresh checkout of the base, as on the build: the full patch applies and hashes match.
+  const m2 = prepare({ root, base });
+  const build = fs.mkdtempSync(path.join(os.tmpdir(), 'odoosh-build-'));
+  git(build, 'clone', '-q', root, '.');
+  git(build, 'checkout', '-q', base);
+  const b64 = fs.readFileSync(path.join(m2.dir, 'patch.b64'), 'utf8');
+  fs.writeFileSync(path.join(build, 'p.patch'), Buffer.from(b64, 'base64'));
+  const applied = git(build, 'apply', 'p.patch');
+  assert.strictEqual(applied.status, 0, applied.stderr);
+  for (const f of m2.files) {
+    if (f.status === 'D') assert.ok(!fs.existsSync(path.join(build, f.path)));
+    else assert.strictEqual(git(build, 'hash-object', f.path).stdout.trim(), f.hash);
+  }
+  assert.strictEqual(git(build, 'apply', '-R', 'p.patch').status, 0);
+  fs.rmSync(root, { recursive: true, force: true });
+  fs.rmSync(build, { recursive: true, force: true });
+});
+
+test('hotpatch: unknown base and --help do nothing', () => {
+  const path = require('path');
+  const { spawnSync } = require('child_process');
+  const cli = path.join(__dirname, '..', 'scripts', 'hotpatch.js');
+  const help = spawnSync(process.execPath, [cli, '--help'], { encoding: 'utf8' });
+  assert.ok(help.stdout.includes('Uso:'));
+  const bad = spawnSync(process.execPath, [cli, 'prepare', '--base', 'deadbeefdeadbeef', '--dir', __dirname], { encoding: 'utf8' });
+  assert.strictEqual(bad.status, 1);
+  assert.match(bad.stderr, /No existe el commit/);
+});

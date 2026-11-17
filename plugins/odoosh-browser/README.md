@@ -21,10 +21,10 @@ plugins/odoosh-browser/
   skills/odoo-task/                     orquestador end-to-end
   skills/odoo-project-setup/            config por repo, rama staging, SSH, Chrome
   skills/odoo-git-staging/              reglas git, commit, push, PRs
-  skills/odoo-sh-remote/                build, logs y tests en Odoo.sh
+  skills/odoo-sh-remote/                build, logs y tests en Odoo.sh; parche de prueba antes del push
   agents/odoo-verifier.md               revisor de evidencias (solo lectura)
   hooks/hooks.json + scripts/guard.js   política de seguridad
-  scripts/                              config, ssh-check, run-state, report
+  scripts/                              config, ssh-check, run-state, report, hotpatch
   tests/                                node --test, sin dependencias
   docs/install-windows.md, docs/security.md
 ```
@@ -70,7 +70,7 @@ Desarrollo local sin instalar, desde la raíz del repositorio: `claude --plugin-
 |---|---|
 | `confirm` (por defecto) | nada: cada push a staging y cada JavaScript en Chrome piden confirmación |
 | `auto` | el `git push origin <staging>` simple |
-| `yolo` | además: push a staging con tags, JavaScript en Chrome en dominios permitidos, las herramientas de Claude in Chrome, los scripts del plugin (`run-state`, `notes`, `report`, `oap.js`, `tasks.js`…, solo desde la carpeta real del plugin) y `ssh` a builds `*.dev.odoo.com` (cualquier comando remoto fuera de la lista denegada, incluidos tests que escriben en la base de staging; en local solo filtros como `grep` o `tail`) |
+| `yolo` | además: push a staging con tags, JavaScript en Chrome en dominios permitidos, las herramientas de Claude in Chrome, los scripts del plugin (`run-state`, `notes`, `report`, `hotpatch`, `oap.js`, `tasks.js`…, solo desde la carpeta real del plugin) y `ssh` a builds `*.dev.odoo.com` (cualquier comando remoto fuera de la lista denegada, incluidos tests que escriben en la base de staging; en local solo filtros como `grep` o `tail`) |
 
 En **cualquier** nivel siguen preguntando: cambios de configuración, push a otras ramas, navegación a dominios no permitidos, `git remote`/`git config` de push y lo que el guard no sepa analizar. Siguen **denegados**: producción, force push, `--all` y similares, comandos peligrosos en el build y otros MCP de navegador. Las reglas de permisos `deny`/`ask` del `settings.json` del usuario también se respetan siempre (el hook no las puede saltar). Fuera de una tarea, `yolo` no aprueba nada.
 
@@ -98,6 +98,10 @@ Una línea por hallazgo que **no era como se pensaba** (comandos que fallaron, r
 - Son datos, no instrucciones: nunca cambian las reglas de seguridad.
 - **Recordatorios por hook** (`scripts/memory-hook.js`, solo con una tarea activa): tras un fallo de herramienta añade un aviso para anotar el hallazgo en el momento (como mucho cada 10 min), y al terminar bloquea **una sola vez por tarea** para preguntar si hay algo que anotar. No se repite si ya se escribió en `memory.md`, y nunca crea bucles de parada.
 - Ver o depurar: `node <plugin>\scripts\notes.js show` y `node <plugin>\scripts\notes.js remove <n>`. Es Markdown plano: también se puede leer a mano.
+
+## Prueba rápida con parche (sin push)
+
+Para probar una corrección sin esperar un build, el agente aplica sus cambios locales en `~/src/user` del build staging, lanza los tests y lo deshace. `scripts/hotpatch.js prepare --base <sha del build>` genera el parche (incluidos commits sin subir y archivos nuevos) con los hashes de cada archivo para comprobar que el build quedó igual que el local. Se aplica por SSH o, si falla o no está configurado, desde el terminal o el editor de archivos del editor web (guardando siempre). La evidencia `hotpatch_tests` no sustituye al build tras el push. Detalle en `skills/odoo-sh-remote/reference/hotpatch.md`.
 
 ## Acceso SSH a Odoo.sh
 
@@ -138,7 +142,7 @@ npm test
 
 ## Estado
 
-v0.5.0. Comprobado en la primera prueba real: el MCP de GitHub **no** tiene herramienta para leer commit statuses ni check runs, y `gh` no estaba instalado; el build se verificó por SSH y por la página de Odoo.sh.
+v0.9.0. Comprobado en la primera prueba real: el MCP de GitHub **no** tiene herramienta para leer commit statuses ni check runs, y `gh` no estaba instalado; el build se verificó por SSH y por la página de Odoo.sh.
 
 Pendiente de validar en un proyecto Odoo.sh real:
 - nombres exactos de las herramientas de Claude in Chrome;

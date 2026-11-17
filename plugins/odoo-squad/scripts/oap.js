@@ -8,7 +8,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 // odoo-squad relies on .oap/, autonomy (yolo) and the subagent rules of this odoosh-browser version.
-const MIN_VERSION = '0.8.2';
+const MIN_VERSION = '0.9.0';
 
 /**
  * Read the version of a plugin folder.

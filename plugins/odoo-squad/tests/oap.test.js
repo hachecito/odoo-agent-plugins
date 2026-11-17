@@ -16,7 +16,7 @@ const AGENTS = path.join(__dirname, '..', 'agents');
  * @param {string} version - plugin version
  * @returns {string} install path
  */
-function fakePlugin(base, version = '0.8.2') {
+function fakePlugin(base, version = '0.9.0') {
   const dir = path.join(base, 'odoosh-browser');
   fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
   fs.mkdirSync(path.join(dir, '.claude-plugin'), { recursive: true });

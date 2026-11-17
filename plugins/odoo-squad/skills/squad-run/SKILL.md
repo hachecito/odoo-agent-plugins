@@ -10,7 +10,7 @@ Tarea: $ARGUMENTS
 
 Esta skill es el **orquestador** y corre en el hilo principal: los subagentes no pueden lanzar otros subagentes. Tú coordinas; los agentes especialistas hacen el trabajo y te devuelven resultados.
 
-Requiere `odoosh-browser` 0.8.2 o posterior (guard, estado, memoria). Todos sus scripts se ejecutan con `node "${CLAUDE_PLUGIN_ROOT}/scripts/oap.js" <script>.js ...`, abreviado abajo como `oap run-state ...`, `oap notes ...`, `oap config ...`, `oap report`. Si `oap.js` dice que no lo encuentra o que es antiguo, pedir al usuario que lo instale o actualice y parar.
+Requiere `odoosh-browser` 0.9.0 o posterior (guard, estado, memoria). Todos sus scripts se ejecutan con `node "${CLAUDE_PLUGIN_ROOT}/scripts/oap.js" <script>.js ...`, abreviado abajo como `oap run-state ...`, `oap notes ...`, `oap config ...`, `oap report`. Si `oap.js` dice que no lo encuentra o que es antiguo, pedir al usuario que lo instale o actualice y parar.
 
 Las carpetas de tarea se gestionan con `node "${CLAUDE_PLUGIN_ROOT}/scripts/tasks.js" ...`, abreviado `tasks ...`.
 
@@ -74,7 +74,9 @@ Son **dos** encargos al tester, nunca uno: el cambio de estado entre ambos lo ha
 ### 6. Bucle de corrección
 Si una fase falla:
 1. `oap run-state evidence ... --status fail` y `oap run-state cycle` (al pasar de 3 ciclos el estado pasa a BLOCKED).
-2. Invocar `squad-fixer` con el fallo concreto del tester. Escribe primero un test de regresión que reproduce el fallo y después el arreglo; revisar que el test comprueba el fallo real y no solo el arreglo. En la siguiente fase **remote-tests**, pasar al tester el nombre de ese test (`<modulo>:<Clase>.<metodo>`) para que lo lance aislado y confirme que se ejecutó.
+2. Invocar `squad-fixer` con el fallo concreto del tester. Escribe primero un test de regresión que reproduce el fallo y después el arreglo; revisar que el test comprueba el fallo real y no solo el arreglo.
+   - **Prueba rápida sin push** (si hay un build staging en marcha): `oap hotpatch prepare --base <sha del build> --only <ruta del test>` y `squad-tester` fase **hotpatch**: el test debe **fallar**. Después `oap hotpatch prepare --base <sha>` (parche completo) y fase **hotpatch** otra vez: debe **pasar**. Registrar `hotpatch_tests` con ambos resultados. Si no falla sin el arreglo, el test no reproduce el fallo: volver al fixer. La primera vez en la tarea, avisar al usuario de que staging se modifica temporalmente.
+   - Después, commit y push como siempre (fase 4): `hotpatch_tests` no sustituye a `remote_tests`. En la siguiente fase **remote-tests**, pasar al tester el nombre de ese test (`<modulo>:<Clase>.<metodo>`) para que lo lance aislado y confirme que se ejecutó.
 3. Según su respuesta: `[REPLAN]` → `squad-planner` rectifica el plan y se vuelve a la fase 2; `[ADVISOR]` → consultar a `squad-advisor`; si no, volver a la fase de pruebas que falló.
 4. **Consultar al advisor** además cuando: lleves más de 2 ciclos sin avance, o vayas a hacer algo irreversible. Si responde `REPLAN` o `PREGUNTAR AL USUARIO`, hacerlo.
 5. Si el estado queda BLOCKED, dejar de iterar, redactar qué se intentó y pedir ayuda al usuario.
@@ -88,7 +90,7 @@ Si una fase falla:
    - Los `[HALLAZGO]` van a `<carpeta>/hallazgos.md`, una línea cada uno.
    - Los `[LECCIÓN]` reutilizables se registran (0 a 5) con `oap notes add --tag <tema> --text "creía X, en realidad Y" --source "<id>"`. Usar un tema (`odoo-sh`, `tests`, `migracion`…), no el nombre de la tarea.
    - Anotar en el momento, durante la tarea, sin esperar a este punto (el hook de memoria lo recuerda).
-6. Detener con TaskStop cualquier agente o shell que siga en segundo plano.
+6. Detener con TaskStop cualquier agente o shell que siga en segundo plano, y comprobar que no queda un parche de prueba aplicado en el build (`git status --porcelain` vacío en `~/src/user`; también si la tarea se cierra bloqueada o abandonada).
 7. `oap report` y entregar al usuario el informe: veredicto, evidencias, archivos, commit, riesgos, lo no verificado, borradores del writer y notas añadidas.
 
 ## Entorno local

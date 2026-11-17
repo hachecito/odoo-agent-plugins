@@ -21,7 +21,7 @@ En un repo de módulos con `/odoosh-browser:odoo-project-setup` ya hecho:
 |---|---|---|
 | `squad-planner` | sonnet | dudas de la tarea antes del plan; plan con criterios de aceptación; rectifica si falla el enfoque |
 | `squad-implementer` | sonnet | código y tests según el plan |
-| `squad-tester` | sonnet | pruebas locales y en Odoo.sh; devuelve evidencias |
+| `squad-tester` | sonnet | pruebas locales, parche de prueba en el build y tests en Odoo.sh; devuelve evidencias |
 | `squad-fixer` | sonnet | causa raíz, test de regresión que reproduce el fallo y corrección mínima |
 | `squad-advisor` | opus | solo consultas: resuelve las dudas de la tarea, decisiones complejas, bloqueos, acciones irreversibles |
 | `squad-writer` | haiku | resumen, descripción del PR y borradores de mensajes al cliente (nunca envía nada) |
@@ -46,6 +46,10 @@ Antes de planificar, el planner lista las dudas que cambiarían el resultado (m�
 ## Errores: test de regresión primero
 
 Cuando una fase falla, el fixer escribe primero un test que reproduce el fallo y después el arreglo, y el tester lo lanza aislado en Odoo.sh (`--test-tags /<modulo>:<Clase>.<metodo>`) para confirmar que se ejecutó. Sin entorno local, el fixer explica qué aserción falla sin el arreglo; los fallos que no son de lógica (build, dependencias, datos de staging) no llevan test.
+
+## Prueba rápida en el build (sin push)
+
+En el bucle de corrección, si hay un build staging en marcha, el tester aplica en él un parche con solo el test de regresión (debe fallar) y después con el arreglo (debe pasar), por SSH o desde el editor web, y lo deshace. Así se comprueba el arreglo sin esperar un build; después se hace commit y push como siempre. Detalle en `odoosh-browser` (`odoo-sh-remote` §5).
 
 ## Autonomía
 
