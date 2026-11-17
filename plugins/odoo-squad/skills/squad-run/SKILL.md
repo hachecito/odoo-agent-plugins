@@ -26,7 +26,7 @@ Las carpetas de tarea se gestionan con `node "${CLAUDE_PLUGIN_ROOT}/scripts/task
 - **Dos sitios para lo aprendido**:
   - `.oap/memory.md`: lecciones que servirán en **otras** tareas del proyecto (`[LECCIÓN]`).
   - `<carpeta>/hallazgos.md`: detalles que solo valen para esta tarea (`[HALLAZGO]`), por ejemplo valores concretos o decisiones del cliente sobre este caso.
-- Parar y preguntar al usuario ante: requisitos ambiguos, sesión caducada o 2FA, acción en producción, o un agente que responda `PREGUNTAR AL USUARIO`.
+- Parar y preguntar al usuario ante: requisitos ambiguos que el advisor no pueda decidir (fase 1), sesión caducada o 2FA, acción en producción, o un agente que responda `PREGUNTAR AL USUARIO`.
 - Modelos por rol (en el frontmatter de cada agente): planner, implementer, tester y fixer en `sonnet`; advisor en `opus`; writer en `haiku`. Son alias a la última versión.
 
 ## Fases
@@ -40,8 +40,15 @@ Las carpetas de tarea se gestionan con `node "${CLAUDE_PLUGIN_ROOT}/scripts/task
 6. Estado git y rama según `odoosh-browser:odoo-git-staging`.
 7. Leer `oap config show`: si `autonomy` es `confirm`, avisar al usuario de que cada push y cada JavaScript en Chrome le pedirán confirmación, también los de los subagentes.
 
-### 1. Plan (`oap run-state state PLANNING`)
-- Invocar `squad-planner` con la tarea, la memoria, el índice de tareas y el estado del repo.
+### 1. Aclaración y plan (`oap run-state state PLANNING`)
+**Aclaración** (antes de planificar; se salta si el usuario dice que no pregunte):
+1. Invocar `squad-planner` en **modo aclaración** con la tarea, la memoria y el índice. Si responde `SIN DUDAS`, guardar sus supuestos en `<carpeta>/aclaraciones.md` y pasar al plan.
+2. Si hay dudas, pasarlas todas en **una** consulta a `squad-advisor` (sección «Aclaraciones»). Lo que devuelva `DECIDIDO` queda resuelto. Lo que devuelva `VERIFICAR EN ODOO` (y los supuestos `[SIN VERIFICAR]` del planner) lo compruebas tú en el código de Odoo de la versión del proyecto (GitHub `odoo/odoo` u `odoo/enterprise`, rama `<versión>`) antes de aceptarlo; si no se puede comprobar, pasa al usuario.
+3. Las `PREGUNTAR AL USUARIO`: preguntarlas al usuario **juntas en un solo mensaje** (AskUserQuestion admite hasta 4 preguntas; con la opción recomendada primero), no una a una. Nunca preguntar lo que el advisor ya decidió.
+4. Guardar en `<carpeta>/aclaraciones.md` una línea por duda: pregunta → respuesta y quién decidió (`advisor` con su prueba, `código Odoo` con archivo:línea de GitHub, o `usuario`). Las respuestas del usuario que valgan para otras tareas del proyecto son además `[LECCIÓN]`.
+
+**Plan**:
+- Invocar `squad-planner` (modo plan) con la tarea, `aclaraciones.md`, la memoria, el índice de tareas y el estado del repo.
 - Guardar su plan en `<carpeta>/plan.md`. Si durante la tarea el usuario añade puntos nuevos, añadirlos al mismo plan como subtareas; si no tienen relación, proponer una tarea nueva.
 - Por cada punto `[ADVISOR]` del plan, consultar a `squad-advisor` (una pregunta concreta, con contexto mínimo) y anotar la decisión en el plan.
 - Si el planner pide datos al usuario y bloquean, preguntarlos ahora.
@@ -61,13 +68,13 @@ Las carpetas de tarea se gestionan con `node "${CLAUDE_PLUGIN_ROOT}/scripts/task
 Son **dos** encargos al tester, nunca uno: el cambio de estado entre ambos lo haces tú, y mientras la ejecución sigue en `REMOTE_BUILD` el guard espacia las lecturas de página de Chrome (60 s por defecto).
 1. `oap run-state state REMOTE_BUILD` e invocar `squad-tester` fase **build**: solo espera a que termine el build y devuelve su resultado.
 2. En cuanto vuelva: registrar `remote_build` y `oap run-state state REMOTE_TESTING`. Si el build falló, ir al bucle de corrección.
-3. Invocar `squad-tester` fase **remote-tests**: logs y tests del módulo. Registrar `logs_reviewed` y `remote_tests`.
+3. Invocar `squad-tester` fase **remote-tests**: logs y tests del módulo, con los nombres de los tests de regresión del plan o del fixer, si los hay. Registrar `logs_reviewed` y `remote_tests`.
 - Si `ssh.enabled` es `false`, los tests se lanzan escribiendo en la terminal del editor web, lo que es mucho más lento. Al terminar la tarea, recomendar al usuario activar SSH con `odoosh-browser:odoo-project-setup`.
 
 ### 6. Bucle de corrección
 Si una fase falla:
 1. `oap run-state evidence ... --status fail` y `oap run-state cycle` (al pasar de 3 ciclos el estado pasa a BLOCKED).
-2. Invocar `squad-fixer` con el fallo concreto del tester.
+2. Invocar `squad-fixer` con el fallo concreto del tester. Escribe primero un test de regresión que reproduce el fallo y después el arreglo; revisar que el test comprueba el fallo real y no solo el arreglo. En la siguiente fase **remote-tests**, pasar al tester el nombre de ese test (`<modulo>:<Clase>.<metodo>`) para que lo lance aislado y confirme que se ejecutó.
 3. Según su respuesta: `[REPLAN]` → `squad-planner` rectifica el plan y se vuelve a la fase 2; `[ADVISOR]` → consultar a `squad-advisor`; si no, volver a la fase de pruebas que falló.
 4. **Consultar al advisor** además cuando: lleves más de 2 ciclos sin avance, o vayas a hacer algo irreversible. Si responde `REPLAN` o `PREGUNTAR AL USUARIO`, hacerlo.
 5. Si el estado queda BLOCKED, dejar de iterar, redactar qué se intentó y pedir ayuda al usuario.

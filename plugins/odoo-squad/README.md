@@ -19,11 +19,11 @@ En un repo de módulos con `/odoosh-browser:odoo-project-setup` ya hecho:
 
 | Agente | Modelo | Función |
 |---|---|---|
-| `squad-planner` | sonnet | plan con criterios de aceptación; rectifica si falla el enfoque |
+| `squad-planner` | sonnet | dudas de la tarea antes del plan; plan con criterios de aceptación; rectifica si falla el enfoque |
 | `squad-implementer` | sonnet | código y tests según el plan |
 | `squad-tester` | sonnet | pruebas locales y en Odoo.sh; devuelve evidencias |
-| `squad-fixer` | sonnet | causa raíz y corrección mínima de los fallos |
-| `squad-advisor` | opus | solo consultas: decisiones complejas, bloqueos, acciones irreversibles |
+| `squad-fixer` | sonnet | causa raíz, test de regresión que reproduce el fallo y corrección mínima |
+| `squad-advisor` | opus | solo consultas: resuelve las dudas de la tarea, decisiones complejas, bloqueos, acciones irreversibles |
 | `squad-writer` | haiku | resumen, descripción del PR y borradores de mensajes al cliente (nunca envía nada) |
 
 Los modelos son alias (`sonnet`, `opus`, `haiku`) que apuntan a la última versión; se cambian en el frontmatter de cada agente.
@@ -33,11 +33,19 @@ El orquestador es la skill `squad-run` (hilo principal), porque un subagente no 
 ## Flujo
 
 ```
-tarea → planner → implementer → tester(local) → commit/push staging → tester(remote)
+tarea → planner(dudas) → advisor → usuario (solo lo que el advisor no decide) → planner(plan) → implementer → tester(local) → commit/push staging → tester(remote)
                                    │ fallo                                  │ fallo
                                    └──────────► fixer ◄─────────────────────┘
                                    (máx. 3 ciclos; advisor si hay bloqueo) → verifier → writer → informe
 ```
+
+## Aclaración antes del plan
+
+Antes de planificar, el planner lista las dudas que cambiarían el resultado (máx. 4). El advisor decide las que se pueden responder con el código del repo o la memoria, citando la prueba; lo que depende del estándar de Odoo se comprueba en su código (GitHub, rama de la versión) antes de aceptarlo. Al usuario solo le llegan las que dependen del negocio o del cliente, todas juntas en un mensaje y con una opción recomendada. Todo queda en `aclaraciones.md`.
+
+## Errores: test de regresión primero
+
+Cuando una fase falla, el fixer escribe primero un test que reproduce el fallo y después el arreglo, y el tester lo lanza aislado en Odoo.sh (`--test-tags /<modulo>:<Clase>.<metodo>`) para confirmar que se ejecutó. Sin entorno local, el fixer explica qué aserción falla sin el arreglo; los fallos que no son de lógica (build, dependencias, datos de staging) no llevan test.
 
 ## Autonomía
 
@@ -59,6 +67,7 @@ Los subagentes no pueden hacer commit ni push: el guard lo deniega y solo el orq
     index.md                        una línea por tarea: id · estado · título
     20261112-campo-referencia/
       task.md                       la tarea tal como se entregó
+      aclaraciones.md               dudas resueltas antes del plan y quién las decidió
       plan.md                       plan del planner (y sus rectificaciones)
       hallazgos.md                  detalles que solo valen para esta tarea
 ```
