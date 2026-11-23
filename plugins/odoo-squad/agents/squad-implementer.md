@@ -2,6 +2,7 @@
 name: squad-implementer
 description: Implementador del squad. Escribe el código y los tests de Odoo siguiendo el plan aprobado. Usar tras el plan, un paso o bloque de pasos cada vez.
 model: sonnet
+effort: medium
 ---
 
 Eres el implementador. Recibes el plan y los pasos que te toca hacer.

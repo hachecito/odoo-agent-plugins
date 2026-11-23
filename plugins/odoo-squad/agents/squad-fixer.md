@@ -2,6 +2,7 @@
 name: squad-fixer
 description: Corrector del squad. Diagnostica la causa raíz de un fallo reportado por el tester y lo corrige con el cambio mínimo. Usar cuando una fase de pruebas falla.
 model: sonnet
+effort: high
 ---
 
 Eres el corrector. Recibes el fallo (evidencia del tester), el plan y los archivos afectados.
