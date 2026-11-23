@@ -46,7 +46,12 @@ JupyterLab abre archivos y carpetas por URL con `/lab/tree/<ruta>`; en Odoo.sh e
 
 Rutas `logs`, `src/user`, `src/odoo` y `src/enterprise` confirmadas por el usuario; el patrón `/lab/tree/<ruta>` es de la documentación de JupyterLab.
 
-**[no verificado] Lectura por API**: Jupyter Server expone `GET /api/contents/<ruta>?content=1&format=text`, que devuelve JSON con el campo `content`. En Odoo.sh sería `https://<build>/odoo-sh/editor/api/contents/logs/odoo.log?content=1&format=text`. Devuelve el archivo **entero**: usarla solo para archivos pequeños (por ejemplo una salida ya filtrada en `~/agent-out.txt`), **nunca para logs**. Solo `GET`: está prohibido escribir por API (los archivos se cambian con el parche o el editor, ver §5).
+**Lectura por API (verificada en un build de Odoo 18, noviembre de 2026)**: `https://<build>/odoo-sh/editor/api/contents/<ruta>?content=1&format=text&type=file`, con `<ruta>` relativa a `~` (por ejemplo `oap-out.txt` para `~/oap-out.txt`). Navegar a la URL en una pestaña y leerla con `get_page_text`: devuelve JSON con el archivo en el campo `content`, con la sesión del navegador.
+- Devuelve el archivo **entero**, sin límite (se leyeron 29 KB completos): usarla solo para salidas ya filtradas, **nunca para logs** ni archivos grandes.
+- `get_page_text` reduce los espacios seguidos a uno: vale para salidas, recuentos y hashes, no para comprobar la sangría de código.
+- La ruta `/odoo-sh/editor/files/<ruta>` responde 403 (*Blocking request from unknown origin*): usar la API.
+- Un archivo inexistente devuelve un error de texto sin JSON (`get_page_text` puede fallar; `read_page` lo muestra).
+- Solo `GET`: está prohibido escribir por API (los archivos se cambian con el parche o el editor, ver §5).
 
 ## 4. Interfaz
 
@@ -68,13 +73,13 @@ tail -n 200 ~/logs/update.log
 La carpeta `https://<build>/odoo-sh/editor/lab/tree/logs` sirve para **ver** qué archivos hay; no abrirlos con doble clic.
 
 ### Leer la salida de un terminal (verificado en prueba real)
-El terminal web es **xterm.js dibujado en canvas**: leer el texto de la página no devuelve nada útil. Solo funciona la **captura de pantalla**, y el scroll del terminal no es fiable desde la herramienta. Por eso:
-1. Comandos cortos: filtrar ya en el propio comando (`| tail -n 40`, `grep ... | head -n 40`) y leer con una captura.
-2. Salidas largas: redirigir a un archivo y leerlo por partes, con varias capturas de `sed -n '1,40p' <archivo>`, `sed -n '41,80p' <archivo>`, etc.
+El terminal web es **xterm.js dibujado en canvas**: leer el texto de la página no devuelve nada útil, y el scroll del terminal no es fiable desde la herramienta. Por eso:
+1. **Salidas de más de unas pocas líneas (preferente)**: redirigir a un archivo, ya filtrado, y leerlo **como texto** por la API de §3 en otra pestaña. Es más barato y fiable que las capturas (los hashes y números llegan exactos).
    ```bash
-   <comando> > ~/agent-out.txt 2>&1
+   <comando> 2>&1 | tail -n 200 > ~/agent-out.txt; echo EXIT=$?
    ```
-3. **[no verificado]** Abrir el archivo en una pestaña del editor (`https://<build>/odoo-sh/editor/lab/tree/agent-out.txt`) o leerlo por la API de §3 podría permitir leer el texto sin capturas. Probarlo y anotar el resultado aquí.
+   `https://<build>/odoo-sh/editor/api/contents/agent-out.txt?content=1&format=text&type=file`
+2. Comandos cortos (`EXIT=`, un hash, una línea): filtrar en el propio comando y leer con una captura.
 
 Borrar el archivo al terminar (`rm ~/agent-out.txt`; un `rm` sin `-rf` está permitido).
 
@@ -108,6 +113,7 @@ Los correos salientes de staging se interceptan con un *mail catcher*; el proyec
 | Editar `src/odoo`, `src/enterprise` o `src/user` fuera de la prueba rápida con parche | Los cambios no persisten en nuevos builds y no pasan por git; guardar un `.py` reinicia el servidor. Los cambios se hacen en local; en el build solo se prueban con [hotpatch.md](hotpatch.md), que se deshace siempre |
 | `git push` / `odoosh-push` desde el terminal | La documentación lo describe como flujo válido, pero salta las salvaguardas del plugin. El hook lo bloquea |
 | Escribir con la consola Odoo shell | Las transacciones se confirman solas |
+| `odoo-bin shell` interactivo o con `commit()` | Para diagnosticar, solo el script de solo lectura de [diagnostico.md](diagnostico.md); el hook deniega `commit(` y pide confirmación si no puede leer el script |
 | SQL de escritura en `psql` | Bloqueado por el hook |
 | Editor de un build de producción | Solo lectura y fuera del alcance del agente |
 

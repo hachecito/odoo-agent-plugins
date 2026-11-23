@@ -330,3 +330,24 @@ test('hotpatch: untracked files are flagged and the apply line uses forward slas
   assert.ok(!/< "[^"]*\\/.test(text), 'no backslashes in the redirected path');
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+test('diag: script is checked, gets an explicit rollback and one-line commands', () => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const { prepare } = require('../scripts/diag');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'odoosh-diag-'));
+  const ok = path.join(root, 'ok.py');
+  fs.writeFileSync(ok, "print(env['res.partner'].search_count([]))\r\n");
+  const r = prepare({ root, file: ok });
+  const decoded = Buffer.from(r.b64, 'base64').toString('utf8');
+  assert.ok(decoded.includes(`exec(compile(${JSON.stringify("print(env['res.partner'].search_count([]))\n")}`));
+  assert.ok(decoded.includes('traceback.print_exc(file=sys.stdout)') && decoded.trimEnd().endsWith('env.cr.rollback()'));
+  assert.ok(!r.editor.includes('\n') && r.editor.includes(r.b64));
+  assert.ok(r.ssh.includes('StrictHostKeyChecking=accept-new') && r.ssh.startsWith('ssh '));
+  assert.ok(fs.existsSync(path.join(root, '.oap', 'odoosh-browser', 'diag', 'script.b64')));
+  const bad = path.join(root, 'bad.py');
+  fs.writeFileSync(bad, 'env.cr.commit()\n');
+  assert.throws(() => prepare({ root, file: bad }), /commit/);
+  fs.rmSync(root, { recursive: true, force: true });
+});

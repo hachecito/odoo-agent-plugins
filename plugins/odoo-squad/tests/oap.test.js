@@ -16,7 +16,7 @@ const AGENTS = path.join(__dirname, '..', 'agents');
  * @param {string} version - plugin version
  * @returns {string} install path
  */
-function fakePlugin(base, version = '0.9.0') {
+function fakePlugin(base, version = '0.10.0') {
   const dir = path.join(base, 'odoosh-browser');
   fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
   fs.mkdirSync(path.join(dir, '.claude-plugin'), { recursive: true });
@@ -52,7 +52,7 @@ test('locate: skips odoosh-browser versions older than the minimum', () => {
   fakePlugin(sibling, '0.10.0');
   const res = locate({ OAP_ODOOSH_BROWSER: old }, tmp, path.join(sibling, 'odoo-squad', 'scripts'));
   assert.strictEqual(res.dir, path.join(sibling, 'odoosh-browser', 'scripts'));
-  assert.ok(compareVersions('0.10.0', MIN_VERSION) > 0 && compareVersions('0.7.9', MIN_VERSION) < 0);
+  assert.ok(compareVersions('0.10.1', MIN_VERSION) > 0 && compareVersions('0.9.1', MIN_VERSION) < 0 && compareVersions('0.10.0', MIN_VERSION) === 0);
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
