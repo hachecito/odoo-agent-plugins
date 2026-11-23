@@ -110,7 +110,7 @@ La clave SSH es **por usuario**, no por proyecto: se configura una vez.
 1. Autorizar la IP en Odoo.sh y esperar a que se aplique.
 2. Añadir la clave pública al perfil de Odoo.sh (avatar → *Profile*):
    - **Importarla desde GitHub** (lo más rápido si la clave ya está en la cuenta de GitHub), o
-   - generarla (`ssh-keygen -t ed25519`) y pegar el contenido de `~/.ssh/id_ed25519.pub` en *Add a key manually*.
+   - generarla (`ssh-keygen -t ed25519`) y pegar el contenido de la clave **pública** (el archivo `.pub` que crea `ssh-keygen`; nunca la privada) en *Add a key manually*.
 3. Ser colaborador del proyecto en Odoo.sh.
 4. Probar con el comando SSH que muestra la rama en Odoo.sh:
    ```powershell

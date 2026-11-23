@@ -14,6 +14,12 @@ description: Procedimientos para verificar una rama staging en Odoo.sh - localiz
 
 Ante cualquier duda sobre comandos, ORM o tests de la versión del proyecto, consultar **context7** (documentación de Odoo) antes de suponer. Si no lo cubre, revisar el código fuente de Odoo de esa versión y marcar como "no verificado" lo que no se haya comprobado.
 
+## Requisitos
+
+- `.oap/odoosh-browser/config.json` válido (`config.js validate`), con la rama staging; si falta, skill `odoo-project-setup`.
+- Al menos un canal: **SSH** (`ssh.enabled` y la clave pública en el perfil de Odoo.sh; comprobar con `ssh-check.js`) o **Claude in Chrome** con la sesión de Odoo.sh iniciada (página de la rama y editor web).
+- Una ejecución abierta con `run-state.js` para registrar evidencias.
+
 ## Navegador: solo Claude in Chrome
 
 - Todo lo que pase por el navegador (Odoo.sh, editor, instancia staging) se hace con **Claude in Chrome** (`mcp__claude-in-chrome__*`), que usa la sesión ya iniciada del usuario.
@@ -93,3 +99,15 @@ Recoger el traceback, relacionarlo con el diff, corregir en local y volver al ci
 ## 5. Prueba rápida con parche (sin commit ni push)
 
 Para probar un cambio en el build staging ya en marcha sin esperar un build: se aplican los cambios locales en `~/src/user` (por SSH o, si falla o no está configurado, por el terminal o el editor de archivos del editor web; **guardar siempre** tras editar), se lanzan los tests y se deshace. Procedimiento completo en [reference/hotpatch.md](reference/hotpatch.md). Evidencia `hotpatch_tests`, que **no** sustituye a `remote_tests`: lo que se entrega es lo que construye Odoo.sh tras el push. Deshacer siempre antes del push y al cerrar la tarea.
+
+## Problemas frecuentes
+
+| Síntoma | Causa | Qué hacer |
+|---|---|---|
+| `exec request failed on channel 0` por SSH | Fallo intermitente de Odoo.sh, con autenticación correcta | Reintentar una vez; si se repite, seguir por el terminal del editor ([editor-jupyterlab.md](reference/editor-jupyterlab.md)) |
+| `ssh-check.js` devuelve `PUBLICKEY` | La clave pública no está en el perfil de Odoo.sh o el usuario no es colaborador | Pedir al usuario que la añada (skill `odoo-project-setup`); mientras tanto, editor |
+| SSH termina por tiempo sin respuesta | Observado cuando la IP del usuario no estaba autorizada en el proyecto (causa no confirmada en todos los casos) | No pulsar *Allow my IP*: avisar al usuario y seguir por el editor |
+| El texto del terminal del editor sale vacío | El terminal es un canvas (xterm.js) | Filtrar la salida en el propio comando y leerla con capturas ([editor-jupyterlab.md](reference/editor-jupyterlab.md) §5) |
+| Los tests terminan con 0 tests | Tag mal escrito o módulo sin tests | Revisar `--test-tags`; no cuenta como `pass` ([tests.md](reference/tests.md)) |
+| Cada lectura de la página de Odoo.sh tarda `build_poll_seconds` (60 s por defecto) | El hook espacia las lecturas mientras el estado es `REMOTE_BUILD` | Es lo previsto durante el build; en cuanto termine, registrar `remote_build` y pasar a `REMOTE_TESTING` (§1.1) |
+| Odoo.sh o GitHub piden login, 2FA o CAPTCHA | Sesión caducada | `run-state.js state BLOCKED` y pedir al usuario que inicie sesión |

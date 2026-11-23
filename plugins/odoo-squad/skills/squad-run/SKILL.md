@@ -1,7 +1,7 @@
 ---
 name: squad-run
 description: Ejecuta una tarea Odoo documentada de principio a fin con un squad de agentes (planificador, implementador, tester, corrector, advisor y redactor), sobre las salvaguardas y la memoria de odoosh-browser. Usar cuando el usuario entregue una tarea (texto o archivo .md) y quiera que se haga completa y sola, incluida la verificación en staging de Odoo.sh.
-argument-hint: "<ruta a tarea.md | descripción de la tarea>"
+argument-hint: "[ruta a tarea.md | descripción de la tarea]"
 ---
 
 # Squad: tarea Odoo autónoma
