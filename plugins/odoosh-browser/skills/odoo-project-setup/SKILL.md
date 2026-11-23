@@ -27,13 +27,13 @@ Las protecciones del plugin (hook `guard.js`) **solo se activan en repos con est
    - **Claude in Chrome**: comprobar que hay herramientas `mcp__claude-in-chrome__*` disponibles. Si no, indicar al usuario que arranque con `claude --chrome` o ejecute `/chrome`. Un plugin no puede activarlo. No sustituirlo por otro MCP de navegador (`chrome-devtools`, Playwright…).
    - **GitHub**: confirmar que el MCP `github` responde (por ejemplo, leer el último commit de la rama staging).
    - **Etapas en Odoo.sh** (si Claude in Chrome está disponible): abrir el proyecto en Odoo.sh y comprobar en el panel izquierdo que la rama staging aparece bajo *Staging* y que las ramas bajo *Production* coinciden con `production_branches` (ver `skills/odoo-sh-remote/reference/odoo-sh-ui.md`). Si no coinciden, avisar y corregir la configuración con el usuario.
-   - **SSH a Odoo.sh** (opcional): obtener el comando SSH del build de la rama staging, leyéndolo con Claude in Chrome en Odoo.sh (rama → botón **SSH**, campo de texto con `ssh <build_id>@<dominio>.dev.odoo.com`) o pidiéndolo al usuario, y ejecutar:
+   - **SSH a Odoo.sh** (opcional y desactivado por defecto): el canal principal es el editor web, que no depende de la IP ni de claves. En proyectos reales SSH ha fallado por tiempo de espera (IP autorizada que cambia) y por clave rechazada, y cada fallo hace perder minutos en las tareas. Configurarlo **solo si el usuario lo pide**. En ese caso: obtener el comando SSH del build de la rama staging, leyéndolo con Claude in Chrome en Odoo.sh (rama → botón **SSH**, campo de texto con `ssh <build_id>@<dominio>.dev.odoo.com`) o pidiéndolo al usuario, y ejecutar:
      `node "${CLAUDE_PLUGIN_ROOT}/scripts/ssh-check.js" <build_id>@<dominio>`
-     - `OK` → `node "${CLAUDE_PLUGIN_ROOT}/scripts/config.js" set-ssh --enabled true` y guardar el host como nota para no volver a pedirlo: `node "${CLAUDE_PLUGIN_ROOT}/scripts/notes.js" add --tag odoo-sh --text "Host SSH del build staging: <build_id>@<dominio>" --source "setup"`. Si en otra tarea el host deja de responder (el build pudo cambiar), pedir el nuevo al usuario y sustituir la nota.
+     - `OK` → `node "${CLAUDE_PLUGIN_ROOT}/scripts/config.js" set-ssh --enabled true` y guardar el host como nota para no volver a pedirlo: `node "${CLAUDE_PLUGIN_ROOT}/scripts/notes.js" add --tag odoo-sh --text "Host SSH del build staging: <build_id>@<dominio>" --source "setup"`. El host es estable por rama (observado en dos proyectos): si en otra tarea deja de responder, la causa suele ser la IP o la clave, no un host nuevo; seguir por el editor y avisar al usuario.
      - `EXEC_INTERMITTENT` → la clave funciona; reintentar más tarde o usar el terminal del editor.
      - `PUBLICKEY` → la clave no está en el perfil de Odoo.sh. Guiar: Odoo.sh → avatar → *Profile* → importar claves desde GitHub, o *Add a key manually* pegando **solo** el contenido de la clave **pública** (el archivo `.pub` de su clave SSH; nunca la privada). Ser colaborador del proyecto.
      - `NETWORK` → la IP no está autorizada o aún no se aplicó; esperar y reintentar.
-     - Si SSH no está disponible, el flujo usará la terminal del editor web de Odoo.sh.
+     - Si no se activa o falla, el flujo usa el terminal del editor web de Odoo.sh (salida leída por la API del editor).
 
 ## Reglas
 

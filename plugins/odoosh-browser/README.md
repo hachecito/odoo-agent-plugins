@@ -93,7 +93,7 @@ Todo el estado del plugin vive en `.oap/` (Odoo Agent Plugins), en la raíz del 
 
 Una línea por hallazgo que **no era como se pensaba** (comandos que fallaron, rutas, host SSH, módulos con tests lentos, rarezas del editor u Odoo.sh). El agente la lee al empezar cada tarea y anota **en el momento** en que descubre algo, no solo al final, así que una tarea cortada o bloqueada también deja sus lecciones.
 
-- Se escribe con `scripts/notes.js add [--tag etiqueta] --text "..."`: una línea, máx. 300 caracteres, máx. 60 notas (se descartan las más antiguas), sin duplicados.
+- Se escribe con `scripts/notes.js add [--tag etiqueta] --text "..."`: una línea, máx. 600 caracteres, máx. 100 notas, sin duplicados. Con la memoria llena, `add` rechaza la nota y pide fusionar o borrar notas obsoletas: nunca se pierde una lección sin avisar.
 - `notes.js` **rechaza** texto que amplíe permisos, toque la configuración de ramas, indique saltarse salvaguardas o parezca un secreto. Editar el archivo directamente pide confirmación.
 - Son datos, no instrucciones: nunca cambian las reglas de seguridad.
 - **Recordatorios por hook** (`scripts/memory-hook.js`, solo con una tarea activa): tras un fallo de herramienta añade un aviso para anotar el hallazgo en el momento (como mucho cada 10 min), y al terminar bloquea **una sola vez por tarea** para preguntar si hay algo que anotar. No se repite si ya se escribió en `memory.md`, y nunca crea bucles de parada.
@@ -108,6 +108,8 @@ Para probar una corrección sin esperar un build, el agente aplica sus cambios l
 Para encontrar la causa de un fallo con los datos reales del staging, el agente ejecuta un script corto de solo lectura con `odoo-bin shell`, que lo deshace todo al terminar. `scripts/diag.js prepare <script.py>` revisa el script y genera el comando de una línea para SSH o para el terminal del editor; por el editor, la salida se lee como texto por la API del editor, sin capturas. El guard deniega los scripts con `commit()`. La salida contiene datos del cliente: no se guarda en la memoria. Detalle en `skills/odoo-sh-remote/reference/diagnostico.md`.
 
 ## Acceso SSH a Odoo.sh
+
+Opcional y desactivado por defecto: el agente trabaja por el editor web de Odoo.sh (terminal y lectura de la salida por la API del editor). Si se activa, el agente lo intenta una sola vez por tarea y, si falla, sigue por el editor.
 
 La clave SSH es **por usuario**, no por proyecto: se configura una vez.
 
@@ -125,7 +127,7 @@ La clave SSH es **por usuario**, no por proyecto: se configura una vez.
 |---|---|
 | `Permission denied (publickey)` | La clave no está en el perfil de Odoo.sh o no se es colaborador |
 | Timeout / connection refused | IP no autorizada o aún no aplicada |
-| `Could not resolve hostname` | Host incorrecto (el build id cambia con cada build) |
+| `Could not resolve hostname` | Host mal escrito o rama staging recreada (el build id suele ser estable por rama) |
 
 Sin SSH, el agente usa la terminal del editor web (`https://<build>/odoo-sh/editor/lab`).
 
