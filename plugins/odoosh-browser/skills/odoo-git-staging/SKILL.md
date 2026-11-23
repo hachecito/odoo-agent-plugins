@@ -46,7 +46,7 @@ Una tarea que lleva más de 24 h sin actividad se considera cerrada.
 Vía principal: página de la rama en Odoo.sh (*HISTORY*) o SSH, según la skill `odoo-sh-remote`. El commit status de GitHub es opcional: Odoo.sh solo lo publica si en *Settings* del proyecto hay un token de GitHub con permiso *Commit statuses (write)* (documentación de Odoo.sh; no comprobado en un proyecto real).
 
 1. El MCP de GitHub configurado **no expone** commit statuses ni check runs (comprobado en la primera prueba real): no intentarlo.
-2. Localizar y verificar el build con la skill `odoo-sh-remote` (SSH preferente; página de la rama en Odoo.sh con Claude in Chrome como alternativa).
+2. Localizar y verificar el build con la skill `odoo-sh-remote` (página de la rama y editor web con Claude in Chrome; SSH solo si está activado).
 3. Opcional, solo si `gh` está instalado y autenticado y el proyecto publica statuses: `gh api repos/<owner>/<repo>/commits/<sha>/status`.
 4. Esperar con límite: ver "Esperar a que termine el build" en la skill `odoo-sh-remote` (el hook espacia las consultas y `run-state.js build-wait` controla el tiempo máximo). Estados `pending` → seguir esperando; `failure`/`error` → leer logs; `success` → build correcto (no implica que los tests funcionales se hayan ejecutado: en staging Odoo.sh no ejecuta los tests unitarios).
 

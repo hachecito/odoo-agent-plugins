@@ -21,7 +21,7 @@ Probar un cambio en el build staging que ya está en marcha, sin commit ni push 
    Imprime los comandos exactos para SSH y para el editor. No se conecta al build.
 3. **Revisar la lista de archivos antes de aplicar.** El parche completo incluye todo lo que git no ignora, también archivos sueltos sin seguimiento (scripts de prueba, un `odoo.conf`, `.env`…), que el script lista aparte. Si aparece algo fuera de los módulos de la tarea, repetir con `--only <modulo> [--only <modulo>...]`. Nunca llevar al build archivos con credenciales o datos de clientes.
 
-## 2a. Aplicar por SSH (preferente)
+## 2a. Aplicar por SSH (solo si `ssh.enabled` y respondió)
 
 Con `ssh.enabled` y el host del build; `ssh <build>` abrevia `ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new <build_id>@<build_domain>` (`SKILL.md`, Datos de contexto). En Windows, con la herramienta **Bash** (Git Bash): PowerShell 5.1 no admite la redirección `<` y pasar el parche por una tubería de PowerShell lo recodifica y lo estropea.
 ```bash
@@ -29,9 +29,9 @@ ssh <build> "cd ~/src/user && git rev-parse HEAD && git status --porcelain"     
 ssh <build> "cat > ~/oap-hotpatch.patch && cd ~/src/user && git apply --check ~/oap-hotpatch.patch && git apply ~/oap-hotpatch.patch" < .oap/odoosh-browser/hotpatch/patch.diff
 ssh <build> "cd ~/src/user && git hash-object <archivos> | cut -c1-12"           # igual que el manifest
 ```
-Si `git status --porcelain` no sale vacío, otra persona o un parche anterior han dejado cambios: no aplicar encima; preguntar al usuario. Si SSH falla (`exec request failed on channel 0` dos veces, sin clave o `ssh.enabled` en `false`), seguir por el editor.
+Si `git status --porcelain` no sale vacío, otra persona o un parche anterior han dejado cambios: no aplicar encima; preguntar al usuario. Si SSH falla por cualquier motivo, seguir por el editor el resto de la tarea, sin reintentar (`SKILL.md`, Canales).
 
-## 2b. Aplicar por el editor (si SSH falla o no está configurado)
+## 2b. Aplicar por el editor (canal principal)
 
 Abrir `https://<build>/odoo-sh/editor` y un terminal (*File → New → Terminal*). Leer [editor-jupyterlab.md](editor-jupyterlab.md) §5 para leer la salida del terminal (solo con capturas).
 

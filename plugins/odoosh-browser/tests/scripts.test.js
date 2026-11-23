@@ -82,10 +82,13 @@ test('memory.md: add, dedupe, cap, remove, round-trip', () => {
   assert.ok(fs.existsSync(file));
   const [n] = loadNotes(root).notes;
   assert.deepStrictEqual([n.tag, n.text, n.source], ['tests', 'Creía que bastaba -u; hace falta --test-tags', 'tarea x']);
-  for (let i = 0; i < MAX_NOTES + 5; i++) addNote(root, { text: `hallazgo ${i}` });
+  for (let i = 0; i < MAX_NOTES - 1; i++) addNote(root, { text: `hallazgo ${i}` });
+  const full = addNote(root, { text: 'una más' });
+  assert.strictEqual(full.added, false);
+  assert.match(full.reason, /Memoria llena/);
   const all = loadNotes(root).notes;
   assert.strictEqual(all.length, MAX_NOTES);
-  assert.strictEqual(all[all.length - 1].text, `hallazgo ${MAX_NOTES + 4}`);
+  assert.strictEqual(all[0].text, 'Creía que bastaba -u; hace falta --test-tags'); // nothing dropped
   assert.strictEqual(removeNote(root, 1), true);
   assert.strictEqual(removeNote(root, 999), false);
   assert.strictEqual(loadNotes(root).notes.length, MAX_NOTES - 1);

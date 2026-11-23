@@ -1,6 +1,6 @@
 ---
 name: odoo-sh-remote
-description: Procedimientos para verificar una rama staging en Odoo.sh - localizar el build, leer su estado y logs, actualizar el módulo y ejecutar tests por SSH o por la terminal del editor web de Odoo.sh usando Claude in Chrome, probar un cambio con un parche temporal en el build antes del push y diagnosticar un fallo con los datos del staging (odoo-bin shell de solo lectura). Usar después de un push a staging, para probar una corrección sin esperar un build o para diagnosticar un build o un fallo en Odoo.sh.
+description: Procedimientos para verificar una rama staging en Odoo.sh - localizar el build, leer su estado y logs, actualizar el módulo y ejecutar tests por la terminal del editor web de Odoo.sh con Claude in Chrome (o por SSH si está activado), probar un cambio con un parche temporal en el build antes del push y diagnosticar un fallo con los datos del staging (odoo-bin shell de solo lectura). Usar después de un push a staging, para probar una corrección sin esperar un build o para diagnosticar un build o un fallo en Odoo.sh.
 ---
 
 # Verificación remota en Odoo.sh
@@ -17,7 +17,14 @@ Ante cualquier duda sobre comandos, ORM o tests de la versión del proyecto, con
 ## Requisitos
 
 - `.oap/odoosh-browser/config.json` válido (`config.js validate`), con la rama staging; si falta, skill `odoo-project-setup`.
-- Al menos un canal: **SSH** (`ssh.enabled` y la clave pública en el perfil de Odoo.sh; comprobar con `ssh-check.js`) o **Claude in Chrome** con la sesión de Odoo.sh iniciada (página de la rama y editor web).
+- **Claude in Chrome** con la sesión de Odoo.sh iniciada (página de la rama y editor web). SSH es opcional (`ssh.enabled`, desactivado por defecto).
+
+## Canales: editor primero, SSH opcional
+
+- **Canal principal: el editor web** (`/odoo-sh/editor`): terminal para los comandos y la API del editor para leer su salida como texto ([reference/editor-jupyterlab.md](reference/editor-jupyterlab.md) §3 y §5). No depende de la IP ni de claves.
+- **SSH solo si `ssh.enabled` es `true`** (el usuario lo activó con `odoo-project-setup`). Observado en proyectos reales: conexiones que terminan por tiempo (`Connection timed out` en el puerto 22, probablemente porque la IP autorizada cambió; no confirmado), `Permission denied (publickey)` sin cambios del lado del agente, y `exec request failed on channel 0` intermitente.
+- **Un solo intento por tarea**: `-o ConnectTimeout=10`. Si falla por cualquier motivo, seguir **toda la tarea** por el editor: no reintentar, no buscar otro host en Odoo.sh ni repetir `ssh-check.js`. Avisar al usuario en el informe final para que revise la clave o la IP, y anotar el fallo con `notes.js` si es nuevo.
+- En los procedimientos de abajo, donde dice «por SSH o por el editor», el orden es este.
 - Una ejecución abierta con `run-state.js` para registrar evidencias.
 
 ## Navegador: solo Claude in Chrome
@@ -39,15 +46,15 @@ Ante cualquier duda sobre comandos, ORM o tests de la versión del proyecto, con
 ## 1. Localizar el build
 
 El MCP de GitHub configurado **no expone** el commit status ni los check runs (comprobado en la primera prueba real). Orden de preferencia:
-1. **SSH** (si `ssh.enabled`): conectarse al build de la rama staging y comprobar que el commit desplegado coincide con el push: `ssh <build>@<host> "git -C ~/src/user rev-parse HEAD"`, y revisar `update.log` / `odoo.log` siguiendo las reglas de lectura de logs (§2). El host sale de las notas del proyecto; si no está o no responde, leerlo en Odoo.sh (botón **SSH** de la rama, paso 3) y actualizar la nota.
-2. `gh api repos/<owner>/<repo>/commits/<sha>/status`, solo si `gh` está instalado y autenticado.
-3. **Interfaz de Odoo.sh con Claude in Chrome**: seguir **[reference/odoo-sh-ui.md](reference/odoo-sh-ui.md)**. Resumen:
+1. **Interfaz de Odoo.sh con Claude in Chrome**: seguir **[reference/odoo-sh-ui.md](reference/odoo-sh-ui.md)**. Resumen:
    - comprobar en el panel izquierdo que la rama staging está bajo *Staging* y no tocar nada de *Production*;
    - en la pestaña **HISTORY**, buscar la entrada con el SHA corto del push y leer su estado (`Test: Success/Warning/...`);
    - el botón **SSH** muestra el comando `ssh <build_id>@<build_domain>` del build actual;
    - **CONNECT** abre la instancia de staging para pruebas funcionales;
    - prohibido: Fork, Merge, Submodule, Delete, Allow my IP, Rebuild y las pestañas BACKUPS, UPGRADE, TOOLS y SETTINGS.
    - La URL de la página de la rama está **[no verificada]**: registrarla como nota la primera vez.
+2. Para confirmar el commit desplegado: `git -C ~/src/user rev-parse HEAD` en el terminal del editor (o por SSH si está activado y responde al primer intento; el host sale de las notas del proyecto, no se busca otro).
+3. `gh api repos/<owner>/<repo>/commits/<sha>/status`, solo si `gh` está instalado y autenticado.
 
 ## 1.1 Esperar a que termine el build
 
@@ -79,15 +86,16 @@ El build tarda según el tamaño de la base de datos (puede ser bastante en clie
 
 ### Por canal
 
-- Por SSH (si `ssh.enabled`): los mismos comandos dentro de `ssh <build>@<host> "<comando>"`, por ejemplo `ssh <build>@<host> "ls -lh --time-style=long-iso ~/logs/"` y `ssh <build>@<host> "grep -nE 'ERROR|CRITICAL|Traceback' ~/logs/odoo.log | tail -n 50"`. Igual para `update.log` / `install.log`.
-- Por el editor web (Claude in Chrome): **leer antes [reference/editor-jupyterlab.md](reference/editor-jupyterlab.md)** (estructura de carpetas, URLs directas, terminal, cómo leer la salida y qué está prohibido). Resumen: logs en `https://<build_domain>/odoo-sh/editor/lab/tree/logs`, código en `.../lab/tree/src/user`, terminal en *File → New → Terminal*. Nunca editar ni guardar archivos en el editor.
+- Por el editor web, canal principal: ver abajo.
+- Por SSH (solo si `ssh.enabled` y respondió al primer intento): los mismos comandos dentro de `ssh <build>@<host> "<comando>"`, por ejemplo `ssh <build>@<host> "ls -lh --time-style=long-iso ~/logs/"` y `ssh <build>@<host> "grep -nE 'ERROR|CRITICAL|Traceback' ~/logs/odoo.log | tail -n 50"`. Igual para `update.log` / `install.log`.
+- Editor web (Claude in Chrome): **leer antes [reference/editor-jupyterlab.md](reference/editor-jupyterlab.md)** (estructura de carpetas, URLs directas, terminal, cómo leer la salida y qué está prohibido). Resumen: logs en `https://<build_domain>/odoo-sh/editor/lab/tree/logs`, código en `.../lab/tree/src/user`, terminal en *File → New → Terminal*. Nunca editar ni guardar archivos en el editor.
 - Registrar: `run-state.js evidence --kind remote_build --status pass|fail --detail "<build/estado>" --source "<commit status|odoo.sh>"` y `--kind logs_reviewed`.
 - Solo cuentan los errores relacionados con el cambio; anotar aparte los preexistentes.
 
 ## 3. Tests del módulo en el build
 
 Ver detalle y comando en [reference/tests.md](reference/tests.md). Resumen:
-1. Ejecutar los tests **solo del módulo modificado** (`--test-tags /<modulo>`, `--no-http`, `--logfile`) sobre la base de datos del build staging, por SSH o por el terminal del editor. Si SSH devuelve `exec request failed on channel 0`, reintentar una vez y después usar el terminal del editor.
+1. Ejecutar los tests **solo del módulo modificado** (`--test-tags /<modulo>`, `--no-http`, `--logfile`) sobre la base de datos del build staging, por el terminal del editor (salida a un archivo y lectura por la API) o por SSH si está activado y respondió.
 2. Buscar en la salida `FAIL`, `ERROR` y el resumen `odoo.tests.result` / `Ran N tests`.
 3. Registrar `run-state.js evidence --kind remote_tests --status pass|fail --detail "<N tests, M fallos>"`.
 4. Si no se pudo ejecutar, registrar `--status skipped` con el motivo. **Nunca** afirmar que pasaron sin la salida.
@@ -98,7 +106,7 @@ Recoger el traceback, relacionarlo con el diff, corregir en local y volver al ci
 
 ## 5. Prueba rápida con parche (sin commit ni push)
 
-Para probar un cambio en el build staging ya en marcha sin esperar un build: se aplican los cambios locales en `~/src/user` (por SSH o, si falla o no está configurado, por el terminal o el editor de archivos del editor web; **guardar siempre** tras editar), se lanzan los tests y se deshace. Procedimiento completo en [reference/hotpatch.md](reference/hotpatch.md). Evidencia `hotpatch_tests`, que **no** sustituye a `remote_tests`: lo que se entrega es lo que construye Odoo.sh tras el push. Deshacer siempre antes del push y al cerrar la tarea.
+Para probar un cambio en el build staging ya en marcha sin esperar un build: se aplican los cambios locales en `~/src/user` (por el terminal del editor web o por SSH si está activado; el editor de archivos solo como último recurso, **guardando siempre** tras editar), se lanzan los tests y se deshace. Procedimiento completo en [reference/hotpatch.md](reference/hotpatch.md). Evidencia `hotpatch_tests`, que **no** sustituye a `remote_tests`: lo que se entrega es lo que construye Odoo.sh tras el push. Deshacer siempre antes del push y al cerrar la tarea.
 
 ## 6. Diagnóstico con datos del staging (solo lectura)
 

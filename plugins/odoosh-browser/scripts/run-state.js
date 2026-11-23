@@ -66,7 +66,11 @@ function main() {
       process.exit(1);
     }
     if (s === 'COMPLETED' && verdict(run).verdict !== 'COMPLETADA') {
-      console.error(`No se puede marcar COMPLETED: ${JSON.stringify(verdict(run))}`);
+      const v = verdict(run);
+      console.error(`No se puede marcar COMPLETED: ${JSON.stringify(v)}`);
+      if (v.skipped.includes('local_checks')) {
+        console.error('Si el proyecto no tiene entorno local de Odoo, registrar local_checks con --status not_applicable y el motivo; skipped significa que se podía hacer y no se hizo.');
+      }
       process.exit(1);
     }
     run.state = s;
