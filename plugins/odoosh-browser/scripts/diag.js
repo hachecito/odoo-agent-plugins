@@ -59,7 +59,7 @@ function prepare({ root, file }) {
     b64,
     out,
     ssh: `ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new <build> '${run} >/tmp/oap-diag.out 2>/tmp/oap-diag.err; echo EXIT=$?; head -c 20000 /tmp/oap-diag.out; tail -n 3 /tmp/oap-diag.err; rm /tmp/oap-diag.out /tmp/oap-diag.err'`,
-    editor: `${run} > ~/${REMOTE_OUT} 2>/tmp/oap-diag.err; echo EXIT=$?; tail -n 3 /tmp/oap-diag.err; rm /tmp/oap-diag.err`,
+    editor: `${run} 2>/tmp/oap-diag.err | head -c 20000 > ~/${REMOTE_OUT}; echo EXIT=\${PIPESTATUS[2]}; tail -n 3 /tmp/oap-diag.err; rm /tmp/oap-diag.err`,
     read: `https://<build>/odoo-sh/editor/api/contents/${REMOTE_OUT}?content=1&format=text&type=file`,
     cleanup: `rm ~/${REMOTE_OUT}`,
   };

@@ -319,3 +319,20 @@ test('odoo-bin shell: inline base64 script is decoded and checked', () => {
   assert.strictEqual(type(run("mail.send(auto_commit=True)\nprint('sent ok, padding to length')\n")), 'deny');
   assert.strictEqual(type('odoo-bin shell -d "$PGDATABASE"'), 'ask');
 });
+
+test('odoo-bin shell: diag.js commands pass the guard, nested browser_batch text is checked', () => {
+  const fs = require('fs');
+  const os = require('os');
+  const { prepare } = require('../scripts/diag');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'odoosh-diag-guard-'));
+  const file = path.join(root, 'd.py');
+  fs.writeFileSync(file, "print(env['res.partner'].search_count([]))\n");
+  const r = prepare({ root, file });
+  assert.strictEqual(bash(r.ssh.replace('<build>', '123@x.dev.odoo.com')), null);
+  const batch = (text) => decide('mcp__claude-in-chrome__browser_batch', { actions: [{ name: 'computer', input: { action: 'type', text, tabId: 1 } }] });
+  assert.strictEqual(batch(r.editor), null);
+  const commit = `echo ${Buffer.from('env.cr.commit()  # padding to reach the length\n').toString('base64')} | base64 -d | odoo-bin shell -d db`;
+  assert.strictEqual(batch(commit), 'deny');
+  assert.strictEqual(batch('odoosh-push'), 'deny');
+  fs.rmSync(root, { recursive: true, force: true });
+});

@@ -1,12 +1,16 @@
 # Diagnóstico con datos del staging (`odoo-bin shell`, solo lectura)
 
-Para entender un fallo con los datos reales del build staging antes de tocar código: leer registros, calcular un campo, llamar al método que falla y ver su traceback, o contar los casos afectados. Sirve para encontrar la causa y escribir un test de regresión que la reproduzca; no sustituye a ese test ni a `remote_tests`.
+Para entender un fallo con los datos reales del build staging antes de tocar código: leer registros, calcular un campo, contar los casos afectados o, con el OK del usuario, llamar al método que falla y ver su traceback. Sirve para encontrar la causa y escribir un test de regresión que la reproduzca; no sustituye a ese test ni a `remote_tests`.
 
 ## Reglas
 
 - Solo en el build **staging** de la tarea (`*.dev.odoo.com`), nunca en producción.
-- **Solo lectura.** El script puede escribir dentro de la transacción para reproducir un fallo (por ejemplo confirmar un pedido y ver el error), pero **nunca** hace `commit()`. Verificado en el código de Odoo 15.0 a 19.0 (`odoo/cli/shell.py`) y en un build de Odoo 18: al terminar el script el shell hace `cr.rollback()` y no queda nada guardado. `diag.js` añade además un `rollback()` explícito.
-- **Riesgo que queda**: algunos métodos de Odoo hacen commit por su cuenta (crons, envío de correo con `auto_commit`, colas). No llamarlos desde un diagnóstico; si el fallo está ahí, reproducirlo en un test.
+- **Solo lectura.** El script **nunca** hace `commit()`; lo que escriba dentro de la transacción se deshace. Verificado en el código de Odoo 15.0 a 19.0 (`odoo/cli/shell.py`) y en un build de Odoo 18: al terminar el script el shell hace `cr.rollback()` y no queda nada guardado. `diag.js` añade además un `rollback()` explícito.
+- **Lo que el rollback no deshace**:
+  - métodos que hacen commit por su cuenta (crons, envío de correo con `auto_commit`, colas);
+  - **llamadas a servicios externos**: correo, HTTP, EDI, conectores fiscales (por ejemplo SII o las comprobaciones de la AEAT de `l10n-spain`), pasarelas de pago. **[no verificado]** que la neutralización del staging de Odoo.sh las bloquee en módulos OCA o propios.
+  
+  Por defecto, el diagnóstico solo **lee** (`search`, `read`, campos calculados, `_compute_*`). Llamar a un método de negocio (`action_confirm`, `action_post`, `write` con automatizaciones…) solo con el OK explícito del usuario y tras comprobar que no contacta con nada externo; si no se puede asegurar, reproducir el fallo en un test.
 - El guard decodifica el script (va en base64 dentro del comando) y deniega `commit(`, `auto_commit=True` y el SQL de escritura. Un `odoo-bin shell` con el script fuera del comando (`< archivo`, consola interactiva) pide confirmación: no se puede revisar.
 - **Datos del cliente**: el staging es una copia neutralizada de producción con datos reales. La salida se usa en la tarea y en el informe local; **nunca** va a la memoria del proyecto (`notes.js`) ni al repo. Imprimir solo lo necesario (ids, recuentos, estados), no nombres, correos ni importes de clientes salvo que hagan falta.
 - No escribir nunca en la consola *Odoo shell* que abre el editor: va con transacción abierta.
@@ -17,7 +21,7 @@ Escribir el script en un archivo local (por ejemplo `.oap/odoosh-browser/diag/ca
 ```python
 so = env['sale.order'].browse(1234)
 print('estado', so.state, 'lineas', len(so.order_line))
-so.action_confirm()          # el traceback, si lo hay, sale en la salida
+print('importe calculado', so.amount_total, 'impuestos', so.order_line.tax_id.ids)
 ```
 Después:
 ```bash
@@ -34,7 +38,7 @@ ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new <build> 'echo <base64> 
 
 ## 2b. Ejecutar por el terminal del editor
 
-1. Abrir un terminal (*File → New → Terminal*) y escribir el comando del editor que imprime `diag.js`, en una sola línea; la salida va a `~/oap-diag.txt`.
+1. Abrir un terminal (*File → New → Terminal*) y escribir el comando del editor que imprime `diag.js`, en una sola línea; la salida va a `~/oap-diag.txt` (cortada a 20 KB).
 2. Esperar a `EXIT=` en el terminal (unos 15-30 s: el shell carga el registro).
 3. Leer la salida **como texto**, sin capturas, en otra pestaña: `https://<build>/odoo-sh/editor/api/contents/oap-diag.txt?content=1&format=text&type=file` con `get_page_text` ([editor-jupyterlab.md](editor-jupyterlab.md) §3).
 4. Borrar: `rm ~/oap-diag.txt`.

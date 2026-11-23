@@ -102,7 +102,7 @@ Para probar un cambio en el build staging ya en marcha sin esperar un build: se 
 
 ## 6. Diagnóstico con datos del staging (solo lectura)
 
-Para encontrar la causa de un fallo con los datos reales antes de tocar código: un script corto con `env` (leer registros, llamar al método que falla y ver el traceback, contar casos) se ejecuta con `odoo-bin shell`, que lo deshace todo al terminar. `diag.js prepare <script.py>` lo revisa y genera el comando de una línea para SSH o para el terminal del editor; por el editor, la salida se lee como texto por la API. Procedimiento, reglas (nunca `commit()`, los datos del cliente no van a la memoria) e interpretación en [reference/diagnostico.md](reference/diagnostico.md). No es una evidencia: lo que confirme se convierte en un test de regresión.
+Para encontrar la causa de un fallo con los datos reales antes de tocar código: un script corto con `env` (leer registros, campos calculados, contar casos; llamar a un método de negocio solo con el OK del usuario, porque el rollback no deshace correos ni llamadas a servicios externos) se ejecuta con `odoo-bin shell`, que lo deshace todo al terminar. `diag.js prepare <script.py>` lo revisa y genera el comando de una línea para SSH o para el terminal del editor; por el editor, la salida se lee como texto por la API. Procedimiento, reglas (nunca `commit()`, los datos del cliente no van a la memoria) e interpretación en [reference/diagnostico.md](reference/diagnostico.md). No es una evidencia: lo que confirme se convierte en un test de regresión.
 
 ## Problemas frecuentes
 
