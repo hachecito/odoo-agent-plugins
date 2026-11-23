@@ -9,7 +9,7 @@ description: Procedimientos para verificar una rama staging en Odoo.sh - localiz
 
 - Los builds de **staging** se crean con una copia neutralizada de producción y **no ejecutan los tests unitarios** automáticamente (solo los de desarrollo). Un build staging en verde solo prueba que instala/actualiza.
 - En el build hay: `odoo-bin shell`, `odoo-update`, `odoosh-restart`, `psql`, `lnav ~/logs/odoo.log`. Logs en `~/logs/` (`odoo.log`, `install.log`, `update.log`, `pip.log`).
-- SSH: `ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new <build_id>@<build_domain>` (abreviado `ssh <build>` en esta skill). El build id y el host cambian con cada build: sin `accept-new`, el primer `ssh` a un build nuevo falla con `Host key verification failed`; `accept-new` acepta solo hosts nuevos y sigue rechazando una clave cambiada.
+- SSH: `ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new <build_id>@<build_domain>` (abreviado `ssh <build>` en esta skill). Observado en dos proyectos: el build id y el host de la rama staging son **estables por rama** y se reutilizan entre builds sucesivos; para saber qué commit corre, usar `git -C ~/src/user rev-parse HEAD`, nunca el build id. `accept-new` evita el `Host key verification failed` de la primera conexión desde una máquina; sigue rechazando una clave cambiada. No buscar un host nuevo: si el de las notas no responde, el problema es la red o la clave (Canales).
 - No hay API pública documentada para builds de Odoo.sh: se usa SSH, la página de la rama en el navegador u, opcionalmente, el commit status de GitHub con `gh`.
 
 Ante cualquier duda sobre comandos, ORM o tests de la versión del proyecto, consultar **context7** (documentación de Odoo) antes de suponer. Si no lo cubre, revisar el código fuente de Odoo de esa versión y marcar como "no verificado" lo que no se haya comprobado.
@@ -120,7 +120,7 @@ Para encontrar la causa de un fallo con los datos reales antes de tocar código:
 | `ssh-check.js` devuelve `PUBLICKEY` | La clave pública no está en el perfil de Odoo.sh o el usuario no es colaborador | Pedir al usuario que la añada (skill `odoo-project-setup`); mientras tanto, editor |
 | SSH termina por tiempo sin respuesta | Observado cuando la IP del usuario no estaba autorizada en el proyecto (causa no confirmada en todos los casos) | No pulsar *Allow my IP*: avisar al usuario y seguir por el editor |
 | El texto del terminal del editor sale vacío | El terminal es un canvas (xterm.js) | Redirigir la salida filtrada a `~/agent-out.txt` y leerla como texto por la API del editor ([editor-jupyterlab.md](reference/editor-jupyterlab.md) §3 y §5) |
-| `Host key verification failed` por SSH | Build nuevo, host desconocido para la máquina | Usar `-o StrictHostKeyChecking=accept-new` (ver Datos de contexto) |
+| `Host key verification failed` por SSH | Primera conexión a ese host desde esta máquina | Usar `-o StrictHostKeyChecking=accept-new` (ver Datos de contexto) |
 | Los tests terminan con 0 tests | Tag mal escrito o módulo sin tests | Revisar `--test-tags`; no cuenta como `pass` ([tests.md](reference/tests.md)) |
 | Cada lectura de la página de Odoo.sh tarda `build_poll_seconds` (60 s por defecto) | El hook espacia las lecturas mientras el estado es `REMOTE_BUILD` | Es lo previsto durante el build; en cuanto termine, registrar `remote_build` y pasar a `REMOTE_TESTING` (§1.1) |
 | Odoo.sh o GitHub piden login, 2FA o CAPTCHA | Sesión caducada | `run-state.js state BLOCKED` y pedir al usuario que inicie sesión |

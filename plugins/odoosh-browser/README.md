@@ -127,7 +127,7 @@ La clave SSH es **por usuario**, no por proyecto: se configura una vez.
 |---|---|
 | `Permission denied (publickey)` | La clave no está en el perfil de Odoo.sh o no se es colaborador |
 | Timeout / connection refused | IP no autorizada o aún no aplicada |
-| `Could not resolve hostname` | Host incorrecto (el build id cambia con cada build) |
+| `Could not resolve hostname` | Host mal escrito o rama staging recreada (el build id suele ser estable por rama) |
 
 Sin SSH, el agente usa la terminal del editor web (`https://<build>/odoo-sh/editor/lab`).
 
