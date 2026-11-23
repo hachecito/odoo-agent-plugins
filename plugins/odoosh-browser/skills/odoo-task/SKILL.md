@@ -1,7 +1,7 @@
 ---
 name: odoo-task
 description: Orquesta una tarea de desarrollo Odoo de principio a fin - análisis, implementación con tests, verificación local, commit, push con confirmación a la rama staging de Odoo.sh, verificación de build, logs y tests remotos, e informe final con evidencias. Usar cuando el usuario pida corregir o desarrollar algo en un módulo Odoo y verificarlo en Odoo.sh.
-argument-hint: "<descripción de la tarea>"
+argument-hint: "[descripción de la tarea]"
 ---
 
 # Tarea Odoo end-to-end
