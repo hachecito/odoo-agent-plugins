@@ -18,6 +18,7 @@ Scripts (rutas absolutas): `node "${CLAUDE_PLUGIN_ROOT}/scripts/<script>.js"`. A
 - **Logs: nunca completos.** Listar antes `~/logs/` y leer siempre con `grep`/`tail` y límite de líneas (reglas en `odoo-sh-remote` §2). `odoo.log` es solo el del día actual.
 - Si el hook `guard.js` deniega una acción, no buscar otra vía para hacer lo mismo: informar al usuario.
 - Dudas sobre Odoo (ORM, vistas, tests, Odoo.sh): consultar **context7** primero; si no basta, el código fuente de Odoo de la versión del proyecto. Lo no comprobado se marca "no verificado".
+- **Seguir hasta cerrar**: las fases se encadenan sin pedir permiso entre ellas; la tarea solo está cerrada en `COMPLETED` o con `run-state.js close` y el informe entregado. Una respuesta solo con texto no la cierra.
 - Detenerse y preguntar ante: requisitos ambiguos, cambios del usuario sin confirmar, sesión caducada/2FA, cualquier acción en producción.
 
 ## Fases
