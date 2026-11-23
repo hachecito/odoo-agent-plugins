@@ -23,7 +23,7 @@ Probar un cambio en el build staging que ya está en marcha, sin commit ni push 
 
 ## 2a. Aplicar por SSH (preferente)
 
-Con `ssh.enabled` y el host del build. En Windows, con la herramienta **Bash** (Git Bash): PowerShell 5.1 no admite la redirección `<` y pasar el parche por una tubería de PowerShell lo recodifica y lo estropea.
+Con `ssh.enabled` y el host del build; `ssh <build>` abrevia `ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new <build_id>@<build_domain>` (`SKILL.md`, Datos de contexto). En Windows, con la herramienta **Bash** (Git Bash): PowerShell 5.1 no admite la redirección `<` y pasar el parche por una tubería de PowerShell lo recodifica y lo estropea.
 ```bash
 ssh <build> "cd ~/src/user && git rev-parse HEAD && git status --porcelain"     # HEAD = base; sin cambios ajenos
 ssh <build> "cat > ~/oap-hotpatch.patch && cd ~/src/user && git apply --check ~/oap-hotpatch.patch && git apply ~/oap-hotpatch.patch" < .oap/odoosh-browser/hotpatch/patch.diff

@@ -25,7 +25,7 @@ const PROTECTED_PATH = /(\.oap[\\/](memory\.md|odoosh-browser[\\/]config\.json)|
 // Programs that write, copy, move or delete the file named in their arguments.
 const WRITER_PROGRAMS = new Set(['tee', 'cp', 'mv', 'rm', 'del', 'copy', 'move', 'set-content', 'add-content', 'out-file', 'copy-item', 'move-item', 'remove-item', 'new-item', 'sc', 'ac', 'ni']);
 // Yolo mode: these scripts of the Odoo agent plugins run without a prompt, only from a real plugin root (see trustedRoots).
-const YOLO_SCRIPTS = new Set(['run-state.js', 'notes.js', 'report.js', 'ssh-check.js', 'config.js', 'oap.js', 'tasks.js', 'hotpatch.js']);
+const YOLO_SCRIPTS = new Set(['run-state.js', 'notes.js', 'report.js', 'ssh-check.js', 'config.js', 'oap.js', 'tasks.js', 'hotpatch.js', 'diag.js']);
 let trustedRootsCache = null;
 
 /**
@@ -352,7 +352,30 @@ function evaluateGit(tokens, ctx) {
  */
 function evaluateRemoteText(text) {
   const hit = REMOTE_DENY.find((r) => r.re.test(text));
-  return hit ? { decision: DENY, reason: `Comando remoto bloqueado: ${hit.why}` } : null;
+  if (hit) return { decision: DENY, reason: `Comando remoto bloqueado: ${hit.why}` };
+  return evaluateOdooShell(text);
+}
+
+/**
+ * Check an odoo-bin shell run: its script must travel inline in base64 so it can be read here.
+ * @param {string} text - remote command or typed terminal text
+ * @returns {{decision: string, reason: string}|null} decision
+ */
+function evaluateOdooShell(text) {
+  if (!/\bodoo-bin\s+shell\b/i.test(text)) return null;
+  const payloads = text.match(/[A-Za-z0-9+/]{40,}={0,2}/g) || [];
+  if (!payloads.length) {
+    return { decision: ASK, reason: 'odoo-bin shell sin el script en base64 dentro del comando: no se puede revisar; confirmar.' };
+  }
+  for (const p of payloads) {
+    const code = Buffer.from(p, 'base64').toString('utf8');
+    if (/\bcommit\s*\(|auto_commit\s*=\s*True/.test(code)) {
+      return { decision: DENY, reason: 'El script de odoo-bin shell hace commit: el diagnóstico es solo lectura (sin commit, el shell deshace todo al terminar).' };
+    }
+    const hit = REMOTE_DENY.find((r) => r.re.test(code));
+    if (hit) return { decision: DENY, reason: `Script de odoo-bin shell bloqueado: ${hit.why}` };
+  }
+  return null;
 }
 
 /**

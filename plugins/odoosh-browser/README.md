@@ -24,7 +24,7 @@ plugins/odoosh-browser/
   skills/odoo-sh-remote/                build, logs y tests en Odoo.sh; parche de prueba antes del push
   agents/odoo-verifier.md               revisor de evidencias (solo lectura)
   hooks/hooks.json + scripts/guard.js   política de seguridad
-  scripts/                              config, ssh-check, run-state, report, hotpatch
+  scripts/                              config, ssh-check, run-state, report, hotpatch, diag
   tests/                                node --test, sin dependencias
   docs/install-windows.md, docs/security.md
 ```
@@ -102,6 +102,10 @@ Una línea por hallazgo que **no era como se pensaba** (comandos que fallaron, r
 ## Prueba rápida con parche (sin push)
 
 Para probar una corrección sin esperar un build, el agente aplica sus cambios locales en `~/src/user` del build staging, lanza los tests y lo deshace. `scripts/hotpatch.js prepare --base <sha del build>` genera el parche (incluidos commits sin subir y archivos nuevos) con los hashes de cada archivo para comprobar que el build quedó igual que el local. Se aplica por SSH o, si falla o no está configurado, desde el terminal o el editor de archivos del editor web (guardando siempre). La evidencia `hotpatch_tests` no sustituye al build tras el push. Detalle en `skills/odoo-sh-remote/reference/hotpatch.md`.
+
+## Diagnóstico con datos del staging
+
+Para encontrar la causa de un fallo con los datos reales del staging, el agente ejecuta un script corto de solo lectura con `odoo-bin shell`, que lo deshace todo al terminar. `scripts/diag.js prepare <script.py>` revisa el script y genera el comando de una línea para SSH o para el terminal del editor; por el editor, la salida se lee como texto por la API del editor, sin capturas. El guard deniega los scripts con `commit()`. La salida contiene datos del cliente: no se guarda en la memoria. Detalle en `skills/odoo-sh-remote/reference/diagnostico.md`.
 
 ## Acceso SSH a Odoo.sh
 

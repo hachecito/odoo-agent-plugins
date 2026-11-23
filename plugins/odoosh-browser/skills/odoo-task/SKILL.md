@@ -54,7 +54,7 @@ Scripts (rutas absolutas): `node "${CLAUDE_PLUGIN_ROOT}/scripts/<script>.js"`. A
 
 ### 8. Recuperación
 - **Anotar en el momento**: en cuanto algo resulte distinto de lo esperado (un comando que falla en el editor o por SSH, una ruta, un test lento, una rareza de Odoo.sh), ejecutar `notes.js add` en ese instante, sin esperar a la fase 9: si la tarea se bloquea o se corta, la lección ya está guardada. Solo si lo has comprobado y la memoria no lo dice ya.
-- Ante un fallo: evidencia con `--status fail`, analizar, corregir y `run-state.js cycle` antes de volver a la fase 3. Para comprobar la corrección sin esperar otro build, se puede probar antes con un parche en el build staging (`odoosh-browser:odoo-sh-remote` §5, evidencia `hotpatch_tests`); el ciclo commit → push sigue siendo obligatorio. Al superar 3 ciclos el estado pasa a BLOCKED: pedir ayuda.
+- Ante un fallo: evidencia con `--status fail`, analizar, corregir y `run-state.js cycle` antes de volver a la fase 3. Para comprobar la corrección sin esperar otro build, se puede probar antes con un parche en el build staging (`odoosh-browser:odoo-sh-remote` §5, evidencia `hotpatch_tests`); el ciclo commit → push sigue siendo obligatorio. Para encontrar la causa con los datos del staging antes de corregir: diagnóstico de solo lectura con `odoo-bin shell` (`odoo-sh-remote` §6). Al superar 3 ciclos el estado pasa a BLOCKED: pedir ayuda.
 
 ### 9. FINAL_VERIFICATION
 Si se aplicó un parche de prueba en el build (`odoo-sh-remote` §5), comprobar que está deshecho (`git status --porcelain` vacío en `~/src/user`; si no es un checkout de git, que no quede `~/oap-hotpatch.patch`, ver `reference/hotpatch.md`). Hacerlo también antes de cada push y si la tarea se cierra bloqueada o abandonada.

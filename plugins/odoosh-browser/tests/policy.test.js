@@ -305,3 +305,17 @@ test('hotpatch on a staging build is allowed, on production it is denied', () =>
   assert.strictEqual(p.evaluateCommand('ssh 1@proj.odoo.com "cd ~/src/user && git apply x"', ctx).decision, p.DENY);
   assert.strictEqual(p.evaluateCommand('ssh 1@proj-stg-1.dev.odoo.com "cd ~/src/user && git apply x && git push"', ctx).decision, p.DENY);
 });
+
+test('odoo-bin shell: inline base64 script is decoded and checked', () => {
+  const b64 = (s) => Buffer.from(s, 'utf8').toString('base64');
+  const run = (code) => `echo ${b64(code)} | base64 -d | odoo-bin shell -d "$PGDATABASE" --no-http`;
+  const readOnly = "print(env['res.partner'].search_count([('active', '=', True)]))\nenv.cr.rollback()\n";
+  assert.strictEqual(bash(`ssh 123@x.dev.odoo.com '${run(readOnly)}'`), null);
+  assert.strictEqual(bash(`ssh 123@x.dev.odoo.com '${run("env['res.partner'].search([]).write({'ref': 'x'})\nenv.cr.commit()\n")}'`), 'deny');
+  assert.strictEqual(bash(`ssh 123@x.dev.odoo.com '${run("env.cr.execute('DELETE FROM res_partner WHERE id = 7')\n")}'`), 'deny');
+  assert.strictEqual(bash("ssh 123@x.dev.odoo.com 'odoo-bin shell -d db < /tmp/script.py'"), 'ask');
+  const type = (text) => decide('mcp__claude-in-chrome__computer', { action: 'type', text });
+  assert.strictEqual(type(run(readOnly)), null);
+  assert.strictEqual(type(run("mail.send(auto_commit=True)\nprint('sent ok, padding to length')\n")), 'deny');
+  assert.strictEqual(type('odoo-bin shell -d "$PGDATABASE"'), 'ask');
+});
