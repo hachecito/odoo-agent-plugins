@@ -1,17 +1,33 @@
+<div align="center">
+
 # Odoo Agent Plugins
 
-[![MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
-[![Agent skill](https://img.shields.io/badge/agent-skill-3b82f6.svg)](plugins/nateherk-design/skills/scroll-craft/SKILL.md)
-[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-d97757.svg)](https://code.claude.com/docs/en/plugins)
+Plugins de Claude Code que llevan una tarea de Odoo de principio a fin: código y tests, push a una rama staging de Odoo.sh, verificación del build y un informe con evidencias, con salvaguardas que impiden tocar producción.
 
-Marketplace de plugins de Claude Code para desarrollo Odoo y Odoo.sh. Cada plugin vive en su propia carpeta dentro de `plugins/`.
+[![Licencia MIT](https://img.shields.io/badge/licencia-MIT-blue.svg)](LICENSE)
+[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-d97757.svg)](https://code.claude.com/docs/en/plugins)
+[![Agent skills](https://img.shields.io/badge/agent-skills-3b82f6.svg)](plugins/)
+[![Node.js >= 18](https://img.shields.io/badge/node-%3E%3D18-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Odoo.sh](https://img.shields.io/badge/Odoo.sh-staging-714b67.svg)](https://www.odoo.sh/)
+[![Gitleaks](https://github.com/hachecito/odoo-agent-plugins/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/hachecito/odoo-agent-plugins/actions/workflows/gitleaks.yml)
+
+<img src="docs/assets/oap-banner.png" alt="OAP, Odoo Agent Plugins" width="820">
+
+</div>
 
 ## Plugins
 
 | Plugin | Descripción |
 |---|---|
-| [odoosh-browser](plugins/odoosh-browser/README.md) | Tareas Odoo de principio a fin sobre una rama staging de Odoo.sh: código y tests, commit, push con confirmación, verificación de build, logs y tests (SSH o Claude in Chrome) e informe con evidencias. |
+| [odoosh-browser](plugins/odoosh-browser/README.md) | Tareas Odoo de principio a fin sobre una rama staging de Odoo.sh: código y tests, commit, push con confirmación, verificación de build, logs y tests (editor web de Odoo.sh con Claude in Chrome, o SSH) e informe con evidencias. |
 | [odoo-squad](plugins/odoo-squad/README.md) | Squad de agentes autónomos que ejecuta una tarea documentada de principio a fin: planifica, implementa, prueba, corrige, consulta a un advisor y redacta el informe. Requiere `odoosh-browser`. |
+
+## Requisitos
+
+- [Claude Code](https://code.claude.com/docs) y Node.js 18 o superior.
+- [Claude in Chrome](https://code.claude.com/docs/en/chrome) con sesión iniciada en Odoo.sh, para leer builds y logs y usar el editor web.
+- `git` y, para las pull requests, la CLI `gh` con sesión.
+- SSH a Odoo.sh es opcional y está desactivado por defecto.
 
 ## Instalación
 
@@ -76,9 +92,6 @@ claude plugin update odoo-squad@odoo-agent-plugins
 plugins/<plugin>/                 un plugin por carpeta (plugin.json, skills, agents, hooks, scripts, docs, tests)
 ```
 
-## Añadir un plugin nuevo
+## Licencia
 
-1. Crear `plugins/<nombre-en-kebab-case>/.claude-plugin/plugin.json` con al menos `name`.
-2. Añadir sus componentes (`skills/`, `agents/`, `hooks/hooks.json`, `scripts/`) y un `README.md`.
-3. Registrar la entrada en `.claude-plugin/marketplace.json` con `"source": "./plugins/<nombre>"`.
-4. Validar: `claude plugin validate .\plugins\<nombre>` y `claude plugin validate .`.
+[MIT](LICENSE) © 2026 Octupus Technologies S.L.
