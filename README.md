@@ -94,4 +94,4 @@ plugins/<plugin>/                 un plugin por carpeta (plugin.json, skills, ag
 
 ## Licencia
 
-[MIT](LICENSE) © 2026 Octupus Technologies S.L.
+[MIT](LICENSE) © 2026 hachecito

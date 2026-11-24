@@ -1,7 +1,7 @@
 {
   "name": "odoo-agent-plugins",
   "owner": {
-    "name": "Octupus Technologies"
+    "name": "hachecito"
   },
   "description": "Herramientas de Claude Code para desarrollo Odoo y Odoo.sh.",
   "plugins": [
