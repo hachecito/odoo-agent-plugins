@@ -1,4 +1,8 @@
-# odoo-agent-plugins
+# Odoo Agent Plugins
+
+[![MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
+[![Agent skill](https://img.shields.io/badge/agent-skill-3b82f6.svg)](plugins/nateherk-design/skills/scroll-craft/SKILL.md)
+[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-d97757.svg)](https://code.claude.com/docs/en/plugins)
 
 Marketplace de plugins de Claude Code para desarrollo Odoo y Odoo.sh. Cada plugin vive en su propia carpeta dentro de `plugins/`.
 
