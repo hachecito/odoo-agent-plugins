@@ -11,7 +11,7 @@ Language: instructions are in English; reply to the user in the language they us
 
 - Verification on Odoo.sh happens on the `staging_branch` in `.oap/odoosh-browser/config.json`. If it is not set, **ask the user** and configure it with the `odoo-project-setup` skill. Never pick it yourself.
 - **Never** commit, merge, rebase or push directly to a production branch. Never force push or delete branches during the task.
-- **Pull requests against production: allowed.** If the user wants to take the change to production through a PR, create a dedicated branch (e.g. `fix/<topic>`), push it (the hook asks for confirmation) and create the PR with `mcp__github__create_pull_request`. **Do not warn that this will be blocked or propose reconfiguring the plugin**: it is not needed. Merging the PR is always done by the user.
+- **Pull requests against production: allowed.** If the user wants to take the change to production through a PR, create a dedicated branch (e.g. `fix/<topic>`), push it (the hook asks for confirmation) and create the PR with `mcp__github__create_pull_request`. **This is not blocked and needs no plugin reconfiguration.** Merging the PR is always done by the user.
 - The `guard.js` hook enforces these rules: if it denies something, **do not try to get around it** (another command, another tool, the GitHub MCP, the Odoo.sh terminal, `odoosh-push`). Tell the user.
 - Every code change goes through local git. Do not use GitHub MCP write tools, except `create_pull_request`.
 

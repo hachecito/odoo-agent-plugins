@@ -32,7 +32,7 @@ Read before using Claude in Chrome on Odoo.sh. Described from a real screenshot 
 | Element | What it is | Use by the agent |
 |---|---|---|
 | Left panel | Branches by stage | Read; click only the configured staging branch |
-| **SSH** button | Shows in the text field the `ssh <build_id>@<build_domain>.dev.odoo.com` command of the current build | **Read the command** to get the SSH host without asking the user; save it as a note |
+| **SSH** button | Shows in the text field the `ssh <build_id>@<build_domain>.dev.odoo.com` command of the current build | **Read the command** to get the SSH host (the user does not have to provide it); save it as a note |
 | **Clone** button | Shows a `git clone` command | Read, if needed |
 | **SQL** button | Shows a database access command | Do not use |
 | **Fork, Merge, Submodule, Delete** buttons | Create branches, merge, change submodules, delete the branch | **Forbidden** |

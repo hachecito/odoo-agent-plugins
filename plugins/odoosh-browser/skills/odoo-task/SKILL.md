@@ -20,7 +20,7 @@ Scripts (absolute paths): `node "${CLAUDE_PLUGIN_ROOT}/scripts/<script>.js"`. Sh
 - **Logs: never whole.** List `~/logs/` first and always read with `grep`/`tail` and a line limit (rules in `odoo-sh-remote` §2). `odoo.log` only holds the current day.
 - If the `guard.js` hook denies an action, do not look for another way to do the same thing: tell the user.
 - Odoo questions (ORM, views, tests, Odoo.sh): check **context7** first; if that is not enough, the Odoo source of the project's version. Anything not checked is marked "unverified".
-- **Keep going until closed**: phases chain without asking permission between them, unless the user asks to wait; the task is only closed at `COMPLETED` or with `run-state.js close` and the report delivered. A text-only reply does not close it.
+- **Keep going until closed**: phases chain one after another, with no permission stop between them unless the user asks to wait; the task is only closed at `COMPLETED` or with `run-state.js close` and the report delivered. A text-only reply does not close it.
 - Stop and ask on: ambiguous requirements, uncommitted user changes, expired session/2FA, any action on production.
 
 ## Phases
