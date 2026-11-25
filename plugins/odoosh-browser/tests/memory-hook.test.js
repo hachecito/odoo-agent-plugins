@@ -57,7 +57,7 @@ test('failure hook: subagents are told to hand the lesson back, on their own int
   const { root, deps } = fixture();
   const t = Date.now();
   const sub = decide({ hook_event_name: 'PostToolUseFailure', cwd: root, agent_id: 'a1' }, { ...deps, now: t });
-  assert.ok(sub.hookSpecificOutput.additionalContext.includes('[LECCIÓN]'));
+  assert.ok(sub.hookSpecificOutput.additionalContext.includes('[LESSON]'));
   assert.strictEqual(decide({ hook_event_name: 'PostToolUseFailure', cwd: root, agent_id: 'a1' }, { ...deps, now: t + 1000 }), null);
   // The main thread's hint window is untouched
   assert.ok(decide({ hook_event_name: 'PostToolUseFailure', cwd: root }, { ...deps, now: t + 1000 }).hookSpecificOutput.additionalContext.includes('notes.js'));

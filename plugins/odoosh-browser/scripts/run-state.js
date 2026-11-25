@@ -17,7 +17,7 @@ function opt(args, name) {
   return i >= 0 ? args[i + 1] : undefined;
 }
 
-const USAGE = 'Uso: run-state.js init --task "..." | state <ESTADO> [--note ...] | evidence ... | cycle | build-wait | close [--note ...] | show';
+const USAGE = 'Usage: run-state.js init --task "..." | state <STATE> [--note ...] | evidence ... | cycle | build-wait | close [--note ...] | show';
 
 /** Entry point: init | state <STATE> | evidence | cycle | show. */
 function main() {
@@ -29,7 +29,7 @@ function main() {
   }
   const loaded = loadConfig(opt(args, 'dir') || process.cwd());
   if (!loaded) {
-    console.error('No hay .oap/odoosh-browser/config.json: ejecutar primero la skill odoo-project-setup.');
+    console.error('No .oap/odoosh-browser/config.json: run the odoo-project-setup skill first.');
     process.exit(1);
   }
   const root = loaded.root;
@@ -47,29 +47,29 @@ function main() {
       evidence: [],
     };
     saveRun(root, run);
-    console.log('Ejecución iniciada (DISCOVERY).');
+    console.log('Run started (DISCOVERY).');
     return;
   }
   if (!run) {
-    console.error('No hay ejecución activa: usar "init --task ...".');
+    console.error('No active run: use "init --task ...".');
     process.exit(1);
   }
   if (cmd === 'state') {
     const s = args[0];
     if (!STATES.includes(s)) {
-      console.error(`Estado inválido. Válidos: ${STATES.join(', ')}`);
+      console.error(`Invalid state. Valid: ${STATES.join(', ')}`);
       process.exit(1);
     }
     // The independent verification (odoo-verifier) runs in FINAL_VERIFICATION: it cannot be skipped.
     if (s === 'COMPLETED' && run.state !== 'FINAL_VERIFICATION') {
-      console.error('Solo se puede marcar COMPLETED desde FINAL_VERIFICATION (tras el verificador).');
+      console.error('COMPLETED can only be set from FINAL_VERIFICATION (after the verifier).');
       process.exit(1);
     }
-    if (s === 'COMPLETED' && verdict(run).verdict !== 'COMPLETADA') {
+    if (s === 'COMPLETED' && verdict(run).verdict !== 'COMPLETE') {
       const v = verdict(run);
-      console.error(`No se puede marcar COMPLETED: ${JSON.stringify(v)}`);
+      console.error(`Cannot set COMPLETED: ${JSON.stringify(v)}`);
       if (v.skipped.includes('local_checks')) {
-        console.error('Si el proyecto no tiene entorno local de Odoo, registrar local_checks con --status not_applicable y el motivo; skipped significa que se podía hacer y no se hizo.');
+        console.error('If the project has no local Odoo environment, record local_checks with --status not_applicable and the reason; skipped means it could have been done and was not.');
       }
       process.exit(1);
     }
@@ -79,7 +79,7 @@ function main() {
     const kind = opt(args, 'kind');
     const status = opt(args, 'status');
     if (!kind || !EVIDENCE_STATUS.includes(status)) {
-      console.error(`Uso: evidence --kind <tipo> --status ${EVIDENCE_STATUS.join('|')} --detail "..." [--source "..."]`);
+      console.error(`Usage: evidence --kind <kind> --status ${EVIDENCE_STATUS.join('|')} --detail "..." [--source "..."]`);
       process.exit(1);
     }
     run.evidence.push({ at: now, kind, status, detail: opt(args, 'detail') || '', source: opt(args, 'source') || '' });
@@ -87,33 +87,33 @@ function main() {
     run.fix_cycles += 1;
     if (run.fix_cycles > MAX_FIX_CYCLES) {
       run.state = 'BLOCKED';
-      run.history.push({ at: now, state: 'BLOCKED', note: `Superado el límite de ${MAX_FIX_CYCLES} ciclos de corrección` });
+      run.history.push({ at: now, state: 'BLOCKED', note: `Exceeded the limit of ${MAX_FIX_CYCLES} fix cycles` });
       saveRun(root, run);
-      console.error(`Límite de ${MAX_FIX_CYCLES} ciclos superado: BLOCKED. Pedir ayuda al usuario.`);
+      console.error(`Limit of ${MAX_FIX_CYCLES} cycles exceeded: BLOCKED. Ask the user for help.`);
       process.exit(1);
     }
   } else if (cmd === 'close') {
     // Ends the run so the guard goes back to idle mode (only direct production pushes blocked).
     if (run.closed) {
-      console.log('La ejecución ya estaba cerrada.');
+      console.log('The run was already closed.');
       return;
     }
     run.closed = true;
-    run.history.push({ at: now, state: run.state, note: `Ejecución cerrada${opt(args, 'note') ? `: ${opt(args, 'note')}` : ''}` });
+    run.history.push({ at: now, state: run.state, note: `Run closed${opt(args, 'note') ? `: ${opt(args, 'note')}` : ''}` });
   } else if (cmd === 'build-wait') {
     // Report minutes spent in REMOTE_BUILD and block the run when the configured limit is exceeded.
     const entered = [...run.history].reverse().find((h) => h.state === 'REMOTE_BUILD');
     if (run.state !== 'REMOTE_BUILD' || !entered) {
-      console.error('La ejecución no está en REMOTE_BUILD.');
+      console.error('The run is not in REMOTE_BUILD.');
       process.exit(1);
     }
     const minutes = (Date.parse(now) - Date.parse(entered.at)) / 60000;
     const limit = loaded.config.build_timeout_minutes;
     if (minutes > limit) {
       run.state = 'BLOCKED';
-      run.history.push({ at: now, state: 'BLOCKED', note: `Build de Odoo.sh sin terminar tras ${limit} min` });
+      run.history.push({ at: now, state: 'BLOCKED', note: `Odoo.sh build not finished after ${limit} min` });
       saveRun(root, run);
-      console.error(`Límite de espera del build (${limit} min) superado: BLOCKED. Avisar al usuario.`);
+      console.error(`Build wait limit (${limit} min) exceeded: BLOCKED. Tell the user.`);
       process.exit(1);
     }
     console.log(JSON.stringify({ waiting_minutes: Math.round(minutes * 10) / 10, limit_minutes: limit, poll_seconds: loaded.config.build_poll_seconds }));

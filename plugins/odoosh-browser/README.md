@@ -1,59 +1,59 @@
 # odoosh-browser
 
-Plugin de Claude Code para completar tareas de Odoo de principio a fin sobre una **rama staging de Odoo.sh**: código y tests, commit, push con confirmación, verificación del build, logs y tests en el build, e informe final con evidencias.
+Claude Code plugin that completes Odoo tasks end to end on an **Odoo.sh staging branch**: code and tests, commit, confirmed push, build verification, logs and tests on the build, and a final report with evidence.
 
-No incluye extensión de navegador ni MCP propios. Combina:
+It ships no browser extension or MCP of its own. It combines:
 
-| Necesidad | Herramienta |
+| Need | Tool |
 |---|---|
-| Código, commits, push | git local |
-| Estado del build | página de la rama en Odoo.sh (*HISTORY*) con Claude in Chrome, o SSH al build. Opcional: commit status en GitHub con `gh` (ver nota) |
-| Logs, `odoo-update`, tests en el build | SSH o terminal del editor web de Odoo.sh |
-| Páginas de Odoo.sh con sesión iniciada | [Claude in Chrome](https://code.claude.com/docs/en/chrome) |
-| Dudas sobre Odoo | context7 + código fuente de Odoo |
-| Salvaguardas | hook `PreToolUse` determinista (`scripts/guard.js`) |
+| Code, commits, push | local git |
+| Build status | branch page on Odoo.sh (*HISTORY*) with Claude in Chrome, or SSH to the build. Optional: GitHub commit status with `gh` (see note) |
+| Logs, `odoo-update`, tests on the build | Odoo.sh web editor terminal, or SSH |
+| Logged-in Odoo.sh pages | [Claude in Chrome](https://code.claude.com/docs/en/chrome) |
+| Odoo questions | context7 + Odoo source code |
+| Safeguards | deterministic `PreToolUse` hook (`scripts/guard.js`) |
 
-## Contenido
+## Contents
 
 ```
 plugins/odoosh-browser/
   .claude-plugin/plugin.json
-  skills/odoo-task/                     orquestador end-to-end
-  skills/odoo-project-setup/            config por repo, rama staging, SSH, Chrome
-  skills/odoo-git-staging/              reglas git, commit, push, PRs
-  skills/odoo-sh-remote/                build, logs y tests en Odoo.sh; parche de prueba antes del push
-  agents/odoo-verifier.md               revisor de evidencias (solo lectura)
-  hooks/hooks.json + scripts/guard.js   política de seguridad
+  skills/odoo-task/                     end-to-end orchestrator
+  skills/odoo-project-setup/            per-repo config, staging branch, SSH, Chrome
+  skills/odoo-git-staging/              git rules, commit, push, PRs
+  skills/odoo-sh-remote/                build, logs and tests on Odoo.sh; test patch before the push
+  agents/odoo-verifier.md               evidence reviewer (read-only)
+  hooks/hooks.json + scripts/guard.js   security policy
   scripts/                              config, ssh-check, run-state, report, hotpatch, diag
-  tests/                                node --test, sin dependencias
+  tests/                                node --test, no dependencies
   docs/install-windows.md, docs/security.md
 ```
 
-## Instalación
+## Installation
 
-Requisitos y pasos detallados para Windows en [docs/install-windows.md](docs/install-windows.md). Resumen:
+Detailed requirements and steps for Windows in [docs/install-windows.md](docs/install-windows.md). Summary:
 
 ```powershell
-claude plugin marketplace add hachecito/odoo-agent-plugins        # o la ruta local de este repo
+claude plugin marketplace add hachecito/odoo-agent-plugins        # or the local path of this repo
 claude plugin install odoosh-browser@odoo-agent-plugins
-claude --chrome                                     # para usar Claude in Chrome
+claude --chrome                                     # to use Claude in Chrome
 ```
 
-Desarrollo local sin instalar, desde la raíz del repositorio: `claude --plugin-dir .\plugins\odoosh-browser`.
+Local development without installing, from the repository root: `claude --plugin-dir .\plugins\odoosh-browser`.
 
-## Uso
+## Usage
 
-1. En el repo de módulos conectado a Odoo.sh, preparar una rama staging para el agente.
-2. `/odoosh-browser:odoo-project-setup`: crea `.oap/odoosh-browser/config.json` con la rama staging y las ramas de producción, y comprueba Chrome, GitHub y SSH.
-3. `/odoosh-browser:odoo-task Corregir el cálculo de X en sale_custom y añadir test`.
-4. El agente pide confirmación antes de cada push y entrega un informe con el resultado: **COMPLETADA**, **PARCIALMENTE VERIFICADA**, **FALLIDA** o **BLOQUEADA**.
+1. In the modules repo connected to Odoo.sh, prepare a staging branch for the agent.
+2. `/odoosh-browser:odoo-project-setup`: creates `.oap/odoosh-browser/config.json` with the staging branch and the production branches, and checks Chrome, GitHub and SSH.
+3. `/odoosh-browser:odoo-task Fix the X computation in sale_custom and add a test`.
+4. The agent asks for confirmation before each push and delivers a report with the result: **COMPLETE**, **PARTIALLY VERIFIED**, **FAILED** or **BLOCKED**.
 
-### Configuración por repo (`.oap/odoosh-browser/config.json`)
+### Per-repo config (`.oap/odoosh-browser/config.json`)
 
 ```json
 {
-  "odoo_sh_project": "mi-proyecto",
-  "staging_branch": "staging-agente",
+  "odoo_sh_project": "my-project",
+  "staging_branch": "agent-staging",
   "production_branches": ["main"],
   "odoo_version": "18.0",
   "ssh": { "enabled": true, "key": null },
@@ -64,94 +64,94 @@ Desarrollo local sin instalar, desde la raíz del repositorio: `claude --plugin-
 }
 ```
 
-`autonomy` tiene tres niveles, que se cambian con `config.js set-autonomy confirm|auto|yolo` (el cambio siempre pide confirmación):
+`autonomy` has three levels, changed with `config.js set-autonomy confirm|auto|yolo` (the change always asks for confirmation):
 
-| Nivel | Qué deja de preguntar durante una tarea |
+| Level | What stops asking during a task |
 |---|---|
-| `confirm` (por defecto) | nada: cada push a staging y cada JavaScript en Chrome piden confirmación |
-| `auto` | el `git push origin <staging>` simple |
-| `yolo` | además: push a staging con tags, JavaScript en Chrome en dominios permitidos, las herramientas de Claude in Chrome, los scripts del plugin (`run-state`, `notes`, `report`, `hotpatch`, `oap.js`, `tasks.js`…, solo desde la carpeta real del plugin) y `ssh` a builds `*.dev.odoo.com` (cualquier comando remoto fuera de la lista denegada, incluidos tests que escriben en la base de staging; en local solo filtros como `grep` o `tail`) |
+| `confirm` (default) | nothing: every push to staging and every JavaScript in Chrome ask for confirmation |
+| `auto` | the plain `git push origin <staging>` |
+| `yolo` | also: push to staging with tags, JavaScript in Chrome on allowed domains, Claude in Chrome tools, the plugin scripts (`run-state`, `notes`, `report`, `hotpatch`, `oap.js`, `tasks.js`…, only from the plugin's real folder) and `ssh` to `*.dev.odoo.com` builds (any remote command outside the denied list, including tests that write to the staging database; locally only filters such as `grep` or `tail`) |
 
-En **cualquier** nivel siguen preguntando: cambios de configuración, push a otras ramas, navegación a dominios no permitidos, `git remote`/`git config` de push y lo que el guard no sepa analizar. Siguen **denegados**: producción, force push, `--all` y similares, comandos peligrosos en el build y otros MCP de navegador. Las reglas de permisos `deny`/`ask` del `settings.json` del usuario también se respetan siempre (el hook no las puede saltar). Fuera de una tarea, `yolo` no aprueba nada.
+At **any** level these still ask: config changes, pushes to other branches, navigation to non-allowed domains, push-related `git remote`/`git config` and anything the guard cannot analyse. Still **denied**: production, force push, `--all` and the like, dangerous commands on the build and other browser MCPs. The `deny`/`ask` permission rules in the user's `settings.json` are also always respected (the hook cannot skip them). Outside a task, `yolo` approves nothing.
 
-Durante una tarea, un **subagente** no puede hacer `git commit` ni `git push` ni escribir el estado o la memoria con `run-state.js`/`notes.js` (denegado): solo el hilo principal. Se detecta con el campo `agent_id` que Claude Code añade a los hooks de subagentes.
+During a task, a **subagent** cannot `git commit` or `git push` or write the state or memory with `run-state.js`/`notes.js` (denied): only the main thread. It is detected with the `agent_id` field Claude Code adds to subagent hooks.
 
-Todo el estado del plugin vive en `.oap/` (Odoo Agent Plugins), en la raíz del repo:
+All plugin state lives in `.oap/` (Odoo Agent Plugins), at the repo root:
 
 ```
 .oap/
-  memory.md                 memoria breve del proyecto, compartida por todos los plugins
+  memory.md                 short project memory, shared by all plugins
   odoosh-browser/
-    config.json            rama staging, ramas de producción, SSH, autonomía
-    run.json               estado y evidencias de la tarea en curso
-    throttle.json          ritmo de consulta al navegador durante el build
+    config.json            staging branch, production branches, SSH, autonomy
+    run.json               state and evidence of the current task
+    throttle.json          browser polling pace during the build
 ```
 
-`config.js init` añade `.oap/` a `.git/info/exclude` (exclusión local; el `.gitignore` del cliente no se toca). Si el repo viene de una versión anterior (`.claude/odoosh-browser*.json`), `config.js migrate` mueve los archivos, convierte las notas antiguas a `memory.md` y excluye `.oap/`.
+`config.js init` adds `.oap/` to `.git/info/exclude` (local exclusion; the client's `.gitignore` is not touched). If the repo comes from an older version (`.claude/odoosh-browser*.json`), `config.js migrate` moves the files, converts the old notes to `memory.md` and excludes `.oap/`.
 
-### Memoria del proyecto (`.oap/memory.md`)
+### Project memory (`.oap/memory.md`)
 
-Una línea por hallazgo que **no era como se pensaba** (comandos que fallaron, rutas, host SSH, módulos con tests lentos, rarezas del editor u Odoo.sh). El agente la lee al empezar cada tarea y anota **en el momento** en que descubre algo, no solo al final, así que una tarea cortada o bloqueada también deja sus lecciones.
+One line per finding that **was not as expected** (commands that failed, paths, SSH host, modules with slow tests, editor or Odoo.sh quirks). The agent reads it at the start of each task and notes things **as soon as** it finds them, not only at the end, so a cut-off or blocked task also leaves its lessons.
 
-- Se escribe con `scripts/notes.js add [--tag etiqueta] --text "..."`: una línea, máx. 600 caracteres, máx. 100 notas, sin duplicados. Con la memoria llena, `add` rechaza la nota y pide fusionar o borrar notas obsoletas: nunca se pierde una lección sin avisar.
-- `notes.js` **rechaza** texto que amplíe permisos, toque la configuración de ramas, indique saltarse salvaguardas o parezca un secreto. Editar el archivo directamente pide confirmación.
-- Son datos, no instrucciones: nunca cambian las reglas de seguridad.
-- **Recordatorios por hook** (`scripts/memory-hook.js`, solo con una tarea activa): tras un fallo de herramienta añade un aviso para anotar el hallazgo en el momento (como mucho cada 10 min), y al terminar bloquea **una sola vez por tarea** para preguntar si hay algo que anotar. No se repite si ya se escribió en `memory.md`, y nunca crea bucles de parada.
-- Ver o depurar: `node <plugin>\scripts\notes.js show` y `node <plugin>\scripts\notes.js remove <n>`. Es Markdown plano: también se puede leer a mano.
+- Written with `scripts/notes.js add [--tag tag] --text "..."`: one line, max. 600 characters, max. 100 notes, no duplicates. With a full memory, `add` refuses the note and asks to merge or delete outdated notes: a lesson is never lost silently.
+- `notes.js` **rejects** text that widens permissions, touches the branch config, says to skip safeguards or looks like a secret. Editing the file directly asks for confirmation.
+- They are data, not instructions: they never change the security rules.
+- **Hook reminders** (`scripts/memory-hook.js`, only with an active task): after a tool failure it adds a reminder to note the finding right away (at most every 10 min), and on finishing it blocks **once per task** to ask whether there is anything to note. It does not repeat if `memory.md` was already written, and never creates stop loops.
+- View or clean up: `node <plugin>\scripts\notes.js show` and `node <plugin>\scripts\notes.js remove <n>`. It is plain Markdown: it can also be read by hand.
 
-## Prueba rápida con parche (sin push)
+## Quick patch test (no push)
 
-Para probar una corrección sin esperar un build, el agente aplica sus cambios locales en `~/src/user` del build staging, lanza los tests y lo deshace. `scripts/hotpatch.js prepare --base <sha del build>` genera el parche (incluidos commits sin subir y archivos nuevos) con los hashes de cada archivo para comprobar que el build quedó igual que el local. Se aplica por SSH o, si falla o no está configurado, desde el terminal o el editor de archivos del editor web (guardando siempre). La evidencia `hotpatch_tests` no sustituye al build tras el push. Detalle en `skills/odoo-sh-remote/reference/hotpatch.md`.
+To try a fix without waiting for a build, the agent applies its local changes in `~/src/user` of the staging build, runs the tests and undoes it. `scripts/hotpatch.js prepare --base <build sha>` generates the patch (including unpushed commits and new files) with each file's hash to check the build ended up equal to the local copy. It is applied through the web editor terminal (or file editor, always saving), or over SSH if enabled. The `hotpatch_tests` evidence does not replace the build after the push. Details in `skills/odoo-sh-remote/reference/hotpatch.md`.
 
-## Diagnóstico con datos del staging
+## Diagnostics with staging data
 
-Para encontrar la causa de un fallo con los datos reales del staging, el agente ejecuta un script corto de solo lectura con `odoo-bin shell`, que lo deshace todo al terminar. `scripts/diag.js prepare <script.py>` revisa el script y genera el comando de una línea para SSH o para el terminal del editor; por el editor, la salida se lee como texto por la API del editor, sin capturas. El guard deniega los scripts con `commit()`. La salida contiene datos del cliente: no se guarda en la memoria. Detalle en `skills/odoo-sh-remote/reference/diagnostico.md`.
+To find the cause of a failure with the real staging data, the agent runs a short read-only script with `odoo-bin shell`, which rolls everything back at the end. `scripts/diag.js prepare <script.py>` checks the script and generates the one-line command for SSH or the editor terminal; through the editor, the output is read as text through the editor API, without screenshots. The guard denies scripts with `commit()`. The output contains client data: it is not saved to memory. Details in `skills/odoo-sh-remote/reference/diagnostics.md`.
 
-## Acceso SSH a Odoo.sh
+## SSH access to Odoo.sh
 
-Opcional y desactivado por defecto: el agente trabaja por el editor web de Odoo.sh (terminal y lectura de la salida por la API del editor). Si se activa, el agente lo intenta una sola vez por tarea y, si falla, sigue por el editor.
+Optional and off by default: the agent works through the Odoo.sh web editor (terminal, and output read through the editor API). If enabled, the agent tries it once per task and, if it fails, continues through the editor.
 
-La clave SSH es **por usuario**, no por proyecto: se configura una vez.
+The SSH key is **per user**, not per project: it is set up once.
 
-1. Autorizar la IP en Odoo.sh y esperar a que se aplique.
-2. Añadir la clave pública al perfil de Odoo.sh (avatar → *Profile*):
-   - **Importarla desde GitHub** (lo más rápido si la clave ya está en la cuenta de GitHub), o
-   - generarla (`ssh-keygen -t ed25519`) y pegar el contenido de la clave **pública** (el archivo `.pub` que crea `ssh-keygen`; nunca la privada) en *Add a key manually*.
-3. Ser colaborador del proyecto en Odoo.sh.
-4. Probar con el comando SSH que muestra la rama en Odoo.sh:
+1. Authorise the IP on Odoo.sh and wait for it to apply.
+2. Add the public key to the Odoo.sh profile (avatar → *Profile*):
+   - **Import it from GitHub** (quickest if the key is already in the GitHub account), or
+   - generate it (`ssh-keygen -t ed25519`) and paste the content of the **public** key (the `.pub` file `ssh-keygen` creates; never the private one) in *Add a key manually*.
+3. Be a collaborator on the Odoo.sh project.
+4. Test with the SSH command the branch shows on Odoo.sh:
    ```powershell
-   node plugins\odoosh-browser\scripts\ssh-check.js <build_id>@<dominio>.dev.odoo.com
+   node plugins\odoosh-browser\scripts\ssh-check.js <build_id>@<domain>.dev.odoo.com
    ```
 
-| Resultado | Causa probable |
+| Result | Likely cause |
 |---|---|
-| `Permission denied (publickey)` | La clave no está en el perfil de Odoo.sh o no se es colaborador |
-| Timeout / connection refused | IP no autorizada o aún no aplicada |
-| `Could not resolve hostname` | Host mal escrito o rama staging recreada (el build id suele ser estable por rama) |
+| `Permission denied (publickey)` | The key is not in the Odoo.sh profile or the user is not a collaborator |
+| Timeout / connection refused | IP not authorised or not applied yet |
+| `Could not resolve hostname` | Misspelled host or staging branch recreated (the build id is usually stable per branch) |
 
-Sin SSH, el agente usa la terminal del editor web (`https://<build>/odoo-sh/editor/lab`).
+Without SSH, the agent uses the web editor terminal (`https://<build>/odoo-sh/editor/lab`).
 
-## Seguridad
+## Security
 
-Ver [docs/security.md](docs/security.md). En resumen: las protecciones completas solo actúan **durante una tarea del plugin** (push a staging o a ramas feature con confirmación; producción, force push y borrado de ramas bloqueados; la interfaz de Odoo.sh es de solo lectura para el agente). Fuera de una tarea, el hook solo impide el push directo a la rama de producción: crear ramas y pull requests contra producción es libre.
+See [docs/security.md](docs/security.md). In short: the full protections only act **during a plugin task** (push to staging or feature branches with confirmation; production, force push and branch deletion blocked; the Odoo.sh UI is read-only for the agent). Outside a task, the hook only prevents a direct push to the production branch: creating branches and pull requests against production is free.
 
 ## Tests
 
-Pruebas de aceptación con un cliente real (rama staging sin uso): [docs/pruebas-aceptacion.md](docs/pruebas-aceptacion.md).
+Acceptance tests with a real client (unused staging branch): [docs/acceptance-tests.md](docs/acceptance-tests.md).
 
-Tests unitarios:
+Unit tests:
 
 ```powershell
-cd plugins\odoosh-browser   # desde la raíz del repositorio
+cd plugins\odoosh-browser   # from the repository root
 npm test
 ```
 
-## Estado
+## Status
 
-v0.9.0. Comprobado en la primera prueba real: el MCP de GitHub **no** tiene herramienta para leer commit statuses ni check runs, y `gh` no estaba instalado; el build se verificó por SSH y por la página de Odoo.sh.
+First real test (v0.9.0): the GitHub MCP has **no** tool to read commit statuses or check runs, and `gh` was not installed; the build was verified over SSH and on the Odoo.sh page.
 
-Pendiente de validar en un proyecto Odoo.sh real:
-- nombres exactos de las herramientas de Claude in Chrome;
-- lectura del commit status con `gh` (requiere el token de GitHub en *Settings* del proyecto Odoo.sh; no probado);
-- obtención automática del host SSH del último build;
-- comando exacto para tests en el build (`skills/odoo-sh-remote/reference/tests.md`).
+Still to validate on a real Odoo.sh project:
+- exact names of the Claude in Chrome tools;
+- reading the commit status with `gh` (needs the GitHub token in the Odoo.sh project *Settings*; not tested);
+- automatic retrieval of the latest build's SSH host;
+- exact command for tests on the build (`skills/odoo-sh-remote/reference/tests.md`).

@@ -1,61 +1,61 @@
-# Instalación en Windows
+# Installing on Windows
 
-## Requisitos
+## Requirements
 
-| Requisito | Comprobación |
+| Requirement | Check |
 |---|---|
-| Claude Code (sesión con `/login`, plan Pro/Max/Team/Enterprise para Claude in Chrome) | `claude --version` |
-| Node.js 18+ (hooks y scripts) | `node -v` |
+| Claude Code (logged in with `/login`, Pro/Max/Team/Enterprise plan for Claude in Chrome) | `claude --version` |
+| Node.js 18+ (hooks and scripts) | `node -v` |
 | Git | `git --version` |
-| OpenSSH (incluido en Windows 10/11) | `ssh -V` |
-| Google Chrome o Edge con la extensión **Claude in Chrome** 1.0.36+ | Chrome Web Store |
-| MCP `github` configurado en Claude Code, o GitHub CLI (`gh`) | `/mcp` o `gh auth status` |
-| context7 (documentación de Odoo) | `/mcp` |
+| OpenSSH (included in Windows 10/11) | `ssh -V` |
+| Google Chrome or Edge with the **Claude in Chrome** extension 1.0.36+ | Chrome Web Store |
+| `github` MCP configured in Claude Code, or GitHub CLI (`gh`) | `/mcp` or `gh auth status` |
+| context7 (Odoo documentation) | `/mcp` |
 
-## 1. Instalar el plugin
+## 1. Install the plugin
 
-Desde el repositorio publicado en GitHub:
+From the repository published on GitHub:
 
 ```powershell
 claude plugin marketplace add hachecito/odoo-agent-plugins
 claude plugin install odoosh-browser@odoo-agent-plugins
 ```
 
-Desde una copia local:
+From a local copy:
 
 ```powershell
-claude plugin marketplace add C:\ruta\odoo-agent-plugins
+claude plugin marketplace add C:\path\odoo-agent-plugins
 claude plugin install odoosh-browser@odoo-agent-plugins
 ```
 
-Comprobar: `claude plugin validate C:\ruta\odoo-agent-plugins\plugins\odoosh-browser`.
+Check: `claude plugin validate C:\path\odoo-agent-plugins\plugins\odoosh-browser`.
 
 ## 2. Claude in Chrome
 
-1. Instalar la extensión Claude in Chrome e iniciar sesión con la misma cuenta/organización que Claude Code.
-2. Arrancar Claude Code con `claude --chrome` (o ejecutar `/chrome` dentro de la sesión; ahí se puede marcar *Enabled by default*).
-3. Iniciar sesión en GitHub y Odoo.sh en ese Chrome. El agente reutiliza la sesión; si caduca o pide 2FA, se detiene y lo indica.
-4. Ver las herramientas disponibles: `/mcp` → `claude-in-chrome` → *View tools*.
+1. Install the Claude in Chrome extension and log in with the same account/organisation as Claude Code.
+2. Start Claude Code with `claude --chrome` (or run `/chrome` inside the session; *Enabled by default* can be ticked there).
+3. Log in to GitHub and Odoo.sh in that Chrome. The agent reuses the session; if it expires or asks for 2FA, it stops and says so.
+4. See the available tools: `/mcp` → `claude-in-chrome` → *View tools*.
 
-No se modifica la configuración del MCP `chrome-devtools` existente.
+The existing `chrome-devtools` MCP config is not modified.
 
-## 3. SSH a Odoo.sh
+## 3. SSH to Odoo.sh
 
-Ver la sección "Acceso SSH a Odoo.sh" del [README](../README.md#acceso-ssh-a-odoosh).
+See the "SSH access to Odoo.sh" section of the [README](../README.md#ssh-access-to-odoosh).
 
-## 4. Commit status de Odoo.sh en GitHub
+## 4. Odoo.sh commit status on GitHub
 
-Opcional y **no probado todavía**. Según la documentación de Odoo.sh, en *Settings* se puede añadir un token de GitHub con permiso *Commit statuses (write)* para que Odoo.sh publique el resultado de cada build en GitHub. Para leerlo hace falta `gh` (el MCP de GitHub no tiene herramienta para commit statuses). Sin esto, el agente consulta el build en la página de la rama en Odoo.sh o por SSH, que es la vía comprobada.
+Optional and **not tested yet**. According to the Odoo.sh documentation, a GitHub token with *Commit statuses (write)* permission can be added in *Settings* so Odoo.sh publishes each build's result on GitHub. Reading it needs `gh` (the GitHub MCP has no tool for commit statuses). Without it, the agent checks the build on the Odoo.sh branch page or over SSH, which is the tested route.
 
-## 5. Preparar cada repo de módulos
+## 5. Prepare each modules repo
 
-Dentro de Claude Code, en el repo: `/odoosh-browser:odoo-project-setup`.
+Inside Claude Code, in the repo: `/odoosh-browser:odoo-project-setup`.
 
-## Problemas frecuentes
+## Common problems
 
-| Síntoma | Solución |
+| Symptom | Fix |
 |---|---|
-| El hook no se ejecuta | Comprobar `node` en el PATH; `/hooks` debe listar el hook del plugin |
-| No aparecen herramientas `claude-in-chrome` | Arrancar con `claude --chrome`; en `/chrome` usar *Reconnect* |
-| `Permission denied (publickey)` | Añadir la clave al perfil de Odoo.sh (importar desde GitHub o pegar el `.pub`) |
-| El push siempre se deniega | `node <plugin>\scripts\config.js show`: revisar `staging_branch` y la rama actual |
+| The hook does not run | Check `node` is on the PATH; `/hooks` must list the plugin's hook |
+| No `claude-in-chrome` tools | Start with `claude --chrome`; in `/chrome` use *Reconnect* |
+| `Permission denied (publickey)` | Add the key to the Odoo.sh profile (import from GitHub or paste the `.pub`) |
+| The push is always denied | `node <plugin>\scripts\config.js show`: check `staging_branch` and the current branch |

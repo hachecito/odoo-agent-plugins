@@ -1,33 +1,33 @@
-# Ejecutar tests en un build de Odoo.sh
+# Running tests on an Odoo.sh build
 
-## Comando verificado (prueba real en un build staging de cliente)
+## Verified command (real test on a client staging build)
 
 ```bash
-odoo-bin -d "$PGDATABASE" -u <modulo> --stop-after-init --no-http \
-  --test-enable --test-tags /<modulo> --logfile=/tmp/agent-tests.log --log-level=test
+odoo-bin -d "$PGDATABASE" -u <module> --stop-after-init --no-http \
+  --test-enable --test-tags /<module> --logfile=/tmp/agent-tests.log --log-level=test
 ```
 
-Después:
+Then:
 
 ```bash
 grep -n 'FAIL:\|ERROR:\|tests.result' /tmp/agent-tests.log | tail -n 50
 ```
 
-- En la prueba se usó la ruta completa `/opt/odoo.sh/odoosh/bin/odoo-bin`. Si `odoo-bin` no está en el PATH del terminal o de SSH, usar esa ruta.
-- `--test-tags /<modulo>` es **imprescindible**: con `--test-enable` solo, se ejecutan los tests de todos los módulos instalados (lento e innecesario).
-- `--no-http` es el patrón que usa el propio `odoo-update` de Odoo.sh y evita chocar con el servidor en marcha. No se ha probado sin él: mantenerlo.
-- `--logfile` deja la salida en un archivo: necesario cuando se usa el terminal web, porque su texto no se puede leer como texto (ver [editor-jupyterlab.md](editor-jupyterlab.md)).
-- Varios módulos: `-u mod_a,mod_b --test-tags /mod_a,/mod_b`.
+- The test used the full path `/opt/odoo.sh/odoosh/bin/odoo-bin`. If `odoo-bin` is not on the PATH of the terminal or SSH, use that path.
+- `--test-tags /<module>` is **essential**: with `--test-enable` alone, the tests of every installed module run (slow and unnecessary).
+- `--no-http` is the pattern Odoo.sh's own `odoo-update` uses and avoids clashing with the running server. Not tested without it: keep it.
+- `--logfile` leaves the output in a file: needed with the web terminal, whose text cannot be read as text (see [editor-jupyterlab.md](editor-jupyterlab.md)).
+- Several modules: `-u mod_a,mod_b --test-tags /mod_a,/mod_b`.
 
-Referencia oficial (*Odoo.sh → Advanced → Containers*), para un módulo que se instala: `odoo-bin -i <modulo> --test-enable --log-level=test --stop-after-init`.
+Official reference (*Odoo.sh → Advanced → Containers*), for a module being installed: `odoo-bin -i <module> --test-enable --log-level=test --stop-after-init`.
 
-## Interpretar la salida
+## Reading the output
 
-- Éxito: `odoo.tests.result: 0 failed, 0 error(s) of N tests` (el formato varía según la versión). Anotar N.
-- Fallo: `FAIL:` / `ERROR:` seguido de traceback. Ver el bloque completo con `grep -n -A 30 'FAIL:\|ERROR:' /tmp/agent-tests.log | head -n 120` y guardarlo como evidencia.
-- Sin tests ejecutados (0 tests): el módulo no tiene tests o el tag es incorrecto; no cuenta como `pass`.
-- Al terminar: `rm /tmp/agent-tests.log`.
+- Success: `odoo.tests.result: 0 failed, 0 error(s) of N tests` (the format varies by version). Note N.
+- Failure: `FAIL:` / `ERROR:` followed by a traceback. See the whole block with `grep -n -A 30 'FAIL:\|ERROR:' /tmp/agent-tests.log | head -n 120` and keep it as evidence.
+- No tests run (0 tests): the module has no tests or the tag is wrong; it does not count as `pass`.
+- When done: `rm /tmp/agent-tests.log`.
 
-## Recordatorio
+## Reminder
 
-La documentación oficial avisa de que estas operaciones **no están aisladas**: `-u` actualiza el módulo en la base de datos del build. En staging (copia neutralizada de producción) es aceptable; nunca en producción.
+The official documentation warns that these operations are **not isolated**: `-u` updates the module in the build's database. On staging (neutralised copy of production) that is acceptable; never on production.

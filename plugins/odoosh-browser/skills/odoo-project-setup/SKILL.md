@@ -1,42 +1,44 @@
 ---
 name: odoo-project-setup
-description: Prepara un repositorio de módulos Odoo para el agente autónomo. Crea o valida .oap/odoosh-browser/config.json, pide al usuario la rama staging de Odoo.sh, declara las ramas de producción y comprueba Claude in Chrome, SSH a Odoo.sh y acceso a GitHub. Usar antes de la primera tarea en un repo, cuando falte la configuración o cuando el usuario quiera cambiar la rama staging.
+description: Prepares an Odoo modules repo for the agent - creates or validates .oap/odoosh-browser/config.json, asks for the Odoo.sh staging branch, declares production branches and checks Claude in Chrome, SSH and GitHub. Use before the first task in a repo, when the config is missing or the user wants to change the staging branch.
 ---
 
-# Configuración del proyecto para odoosh-browser
+# Project setup for odoosh-browser
 
-Objetivo: dejar `.oap/odoosh-browser/config.json` válido en la raíz del repo de módulos y saber qué canales (Chrome, SSH, GitHub) están disponibles.
+Language: instructions are in English; reply to the user in the language they use. Texts for a client use the client's language (Spanish: neutral, never vosotros forms).
 
-Las protecciones del plugin (hook `guard.js`) **solo se activan en repos con este archivo**. Sin él no hay salvaguardas: no empezar ninguna tarea.
+Goal: a valid `.oap/odoosh-browser/config.json` at the root of the modules repo, and knowing which channels (Chrome, SSH, GitHub) are available.
 
-## Pasos
+The plugin's protections (`guard.js` hook) **only apply in repos with this file**. Without it there are no safeguards: do not start any task.
 
-1. **Ubicar el repo**: `git rev-parse --show-toplevel`. Debe ser el repo conectado a Odoo.sh (`git remote -v` apunta a GitHub).
-2. **Ver si ya existe config**:
+## Steps
+
+1. **Locate the repo**: `git rev-parse --show-toplevel`. It must be the repo connected to Odoo.sh (`git remote -v` points to GitHub).
+2. **Check for an existing config**:
    `node "${CLAUDE_PLUGIN_ROOT}/scripts/config.js" show`
-3. **Pedir datos al usuario** (con AskUserQuestion; nunca deducirlos):
-   - **Rama staging** de Odoo.sh que el usuario ha dejado preparada para el agente. Es obligatoria.
-   - **Ramas de producción** (la rama de la etapa Production en Odoo.sh). Por defecto `main,master,production`.
-   - Nombre del proyecto en Odoo.sh y versión de Odoo (se puede proponer la versión leída de `__manifest__.py` o con la skill `detect-env`).
-4. **Crear o actualizar**:
-   - Nuevo: `node "${CLAUDE_PLUGIN_ROOT}/scripts/config.js" init --staging <rama> --production main --project <proyecto> --version 18.0`
-   - Cambiar staging: `node "${CLAUDE_PLUGIN_ROOT}/scripts/config.js" set-staging <rama>`
-   - Validar: `node "${CLAUDE_PLUGIN_ROOT}/scripts/config.js" validate` (debe salir "Configuración válida").
-5. **Carpeta `.oap/` fuera del repo del cliente**: `config.js init` añade `.oap/` a `.git/info/exclude` (exclusión local, no modifica el `.gitignore` del cliente). Si el repo tiene archivos en `.claude/odoosh-browser*.json` o `.claude/odoo-agent*.json`, proponer `config.js migrate` (pide confirmación): los mueve a `.oap/` y convierte las notas antiguas en `.oap/memory.md`.
-6. **Comprobar canales** y anotar el resultado al usuario:
-   - **Claude in Chrome**: comprobar que hay herramientas `mcp__claude-in-chrome__*` disponibles. Si no, indicar al usuario que arranque con `claude --chrome` o ejecute `/chrome`. Un plugin no puede activarlo. No sustituirlo por otro MCP de navegador (`chrome-devtools`, Playwright…).
-   - **GitHub**: confirmar que el MCP `github` responde (por ejemplo, leer el último commit de la rama staging).
-   - **Etapas en Odoo.sh** (si Claude in Chrome está disponible): abrir el proyecto en Odoo.sh y comprobar en el panel izquierdo que la rama staging aparece bajo *Staging* y que las ramas bajo *Production* coinciden con `production_branches` (ver `skills/odoo-sh-remote/reference/odoo-sh-ui.md`). Si no coinciden, avisar y corregir la configuración con el usuario.
-   - **SSH a Odoo.sh** (opcional y desactivado por defecto): el canal principal es el editor web, que no depende de la IP ni de claves. En proyectos reales SSH ha fallado por tiempo de espera (IP autorizada que cambia) y por clave rechazada, y cada fallo hace perder minutos en las tareas. Configurarlo **solo si el usuario lo pide**. En ese caso: obtener el comando SSH del build de la rama staging, leyéndolo con Claude in Chrome en Odoo.sh (rama → botón **SSH**, campo de texto con `ssh <build_id>@<dominio>.dev.odoo.com`) o pidiéndolo al usuario, y ejecutar:
-     `node "${CLAUDE_PLUGIN_ROOT}/scripts/ssh-check.js" <build_id>@<dominio>`
-     - `OK` → `node "${CLAUDE_PLUGIN_ROOT}/scripts/config.js" set-ssh --enabled true` y guardar el host como nota para no volver a pedirlo: `node "${CLAUDE_PLUGIN_ROOT}/scripts/notes.js" add --tag odoo-sh --text "Host SSH del build staging: <build_id>@<dominio>" --source "setup"`. El host es estable por rama (observado en dos proyectos): si en otra tarea deja de responder, la causa suele ser la IP o la clave, no un host nuevo; seguir por el editor y avisar al usuario.
-     - `EXEC_INTERMITTENT` → la clave funciona; reintentar más tarde o usar el terminal del editor.
-     - `PUBLICKEY` → la clave no está en el perfil de Odoo.sh. Guiar: Odoo.sh → avatar → *Profile* → importar claves desde GitHub, o *Add a key manually* pegando **solo** el contenido de la clave **pública** (el archivo `.pub` de su clave SSH; nunca la privada). Ser colaborador del proyecto.
-     - `NETWORK` → la IP no está autorizada o aún no se aplicó; esperar y reintentar.
-     - Si no se activa o falla, el flujo usa el terminal del editor web de Odoo.sh (salida leída por la API del editor).
+3. **Ask the user** (with AskUserQuestion; never infer):
+   - The Odoo.sh **staging branch** the user has prepared for the agent. Mandatory.
+   - **Production branches** (the branch of the Production stage on Odoo.sh). Default `main,master,production`.
+   - Odoo.sh project name and Odoo version (the version read from `__manifest__.py` or with the `detect-env` skill can be proposed).
+4. **Create or update**:
+   - New: `node "${CLAUDE_PLUGIN_ROOT}/scripts/config.js" init --staging <branch> --production main --project <project> --version 18.0`
+   - Change staging: `node "${CLAUDE_PLUGIN_ROOT}/scripts/config.js" set-staging <branch>`
+   - Validate: `node "${CLAUDE_PLUGIN_ROOT}/scripts/config.js" validate` (must report a valid configuration).
+5. **`.oap/` folder kept out of the client's repo**: `config.js init` adds `.oap/` to `.git/info/exclude` (local exclusion; the client's `.gitignore` is not modified). If the repo has files in `.claude/odoosh-browser*.json` or `.claude/odoo-agent*.json`, propose `config.js migrate` (asks for confirmation): it moves them to `.oap/` and converts the old notes into `.oap/memory.md`.
+6. **Check channels** and report the result to the user:
+   - **Claude in Chrome**: check that `mcp__claude-in-chrome__*` tools are available. If not, tell the user to start with `claude --chrome` or run `/chrome`. A plugin cannot enable it. Do not replace it with another browser MCP (`chrome-devtools`, Playwright…).
+   - **GitHub**: confirm the `github` MCP responds (e.g. read the last commit of the staging branch).
+   - **Stages on Odoo.sh** (if Claude in Chrome is available): open the project on Odoo.sh and check in the left panel that the staging branch is under *Staging* and the branches under *Production* match `production_branches` (see `skills/odoo-sh-remote/reference/odoo-sh-ui.md`). If they do not match, warn and fix the config with the user.
+   - **SSH to Odoo.sh** (optional, off by default): the main channel is the web editor, which depends on neither IP nor keys. In real projects SSH has failed with timeouts (authorised IP that changes) and rejected keys, and each failure wastes minutes. Set it up **only if the user asks**. In that case: get the SSH command of the staging branch build, by reading it with Claude in Chrome on Odoo.sh (branch → **SSH** button, text field with `ssh <build_id>@<domain>.dev.odoo.com`) or asking the user, and run:
+     `node "${CLAUDE_PLUGIN_ROOT}/scripts/ssh-check.js" <build_id>@<domain>`
+     - `OK` → `node "${CLAUDE_PLUGIN_ROOT}/scripts/config.js" set-ssh --enabled true` and save the host as a note so it is not asked again: `node "${CLAUDE_PLUGIN_ROOT}/scripts/notes.js" add --tag odoo-sh --text "SSH host of the staging build: <build_id>@<domain>" --source "setup"`. The host is stable per branch (observed in two projects): if it stops answering in a later task, the cause is usually the IP or the key, not a new host; continue through the editor and tell the user.
+     - `EXEC_INTERMITTENT` → the key works; retry later or use the editor terminal.
+     - `PUBLICKEY` → the key is not in the Odoo.sh profile. Guide: Odoo.sh → avatar → *Profile* → import keys from GitHub, or *Add a key manually* pasting **only** the content of the **public** key (the `.pub` file of their SSH key; never the private one). They must be a project collaborator.
+     - `NETWORK` → the IP is not authorised or not applied yet; wait and retry.
+     - If it is not enabled or fails, the flow uses the Odoo.sh web editor terminal (output read through the editor API).
 
-## Reglas
+## Rules
 
-- Nunca leer, mostrar ni copiar claves privadas, cookies o tokens.
-- Añadir una clave al perfil de Odoo.sh modifica la cuenta del usuario: solo con su confirmación explícita y preferiblemente que lo haga el propio usuario.
-- La rama staging nunca puede coincidir con una rama de producción (el script lo rechaza).
+- Never read, show or copy private keys, cookies or tokens.
+- Adding a key to the Odoo.sh profile changes the user's account: only with their explicit confirmation, preferably done by the user.
+- The staging branch can never be a production branch (the script rejects it).

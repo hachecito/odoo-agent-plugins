@@ -8,11 +8,11 @@ const path = require('path');
 
 const REMOTE_OUT = 'oap-diag.txt';
 const MAX_SCRIPT_BYTES = 6000;
-const USAGE = `Uso: diag.js prepare <script.py> [--dir <repo>]
-  Revisa un script de diagnóstico de solo lectura para odoo-bin shell (sin commit ni SQL de
-  escritura), le añade env.cr.rollback() y guarda .oap/odoosh-browser/diag/script.b64.
-  No se conecta al build: imprime el comando para SSH y para el terminal del editor, y la URL
-  para leer la salida por la API del editor.`;
+const USAGE = `Usage: diag.js prepare <script.py> [--dir <repo>]
+  Checks a read-only diagnostic script for odoo-bin shell (no commit, no write SQL), wraps it
+  with env.cr.rollback() and saves .oap/odoosh-browser/diag/script.b64.
+  It never connects to the build: it prints the command for SSH and for the editor terminal,
+  and the URL to read the output through the editor API.`;
 
 /**
  * Reject scripts that would persist changes or run destructive SQL.
@@ -20,11 +20,11 @@ const USAGE = `Uso: diag.js prepare <script.py> [--dir <repo>]
  * @returns {string|null} reason to reject, null when acceptable
  */
 function checkScript(code) {
-  if (/\bcommit\s*\(|auto_commit\s*=\s*True/.test(code)) return 'el script hace commit; el diagnóstico es solo lectura.';
+  if (/\bcommit\s*\(|auto_commit\s*=\s*True/.test(code)) return 'the script commits; diagnostics are read-only.';
   if (/\bDELETE\s+FROM\b|\bUPDATE\s+\S+\s+SET\b|\bALTER\s+TABLE\b|\bDROP\s+(TABLE|DATABASE|SCHEMA)\b|\bTRUNCATE\b/i.test(code)) {
-    return 'el script lleva SQL de escritura.';
+    return 'the script contains write SQL.';
   }
-  if (Buffer.byteLength(code, 'utf8') > MAX_SCRIPT_BYTES) return `el script pasa de ${MAX_SCRIPT_BYTES} bytes; dividirlo.`;
+  if (Buffer.byteLength(code, 'utf8') > MAX_SCRIPT_BYTES) return `the script is over ${MAX_SCRIPT_BYTES} bytes; split it.`;
   return null;
 }
 
@@ -36,7 +36,7 @@ function checkScript(code) {
 function prepare({ root, file }) {
   const code = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
   const reason = checkScript(code);
-  if (reason) throw new Error(`Script rechazado: ${reason}`);
+  if (reason) throw new Error(`Script rejected: ${reason}`);
   // Script errors go to stdout (stderr is full of module warnings). The shell already rolls back at
   // the end (odoo/cli/shell.py, 15.0-19.0); the finally keeps it explicit.
   const wrapped = [
@@ -78,13 +78,13 @@ function main(args) {
   const root = path.resolve(di >= 0 ? args[di + 1] : process.cwd());
   try {
     const r = prepare({ root, file: path.resolve(args[1]) });
-    console.log(`Guardado: ${path.relative(root, r.out).replace(/\\/g, '/')}`);
-    console.log('\nPor SSH (herramienta Bash, comillas simples para que $PGDATABASE se expanda en el build):');
+    console.log(`Saved: ${path.relative(root, r.out).replace(/\\/g, '/')}`);
+    console.log('\nVia SSH (Bash tool; single quotes so $PGDATABASE expands on the build):');
     console.log(r.ssh);
-    console.log('\nPor el terminal del editor (escribirlo en una sola línea):');
+    console.log('\nVia the editor terminal (type it as one line):');
     console.log(r.editor);
-    console.log(`Leer la salida como texto: ${r.read}`);
-    console.log(`Al terminar: ${r.cleanup}`);
+    console.log(`Read the output as text: ${r.read}`);
+    console.log(`When done: ${r.cleanup}`);
   } catch (e) {
     console.error(e.message);
     process.exit(1);

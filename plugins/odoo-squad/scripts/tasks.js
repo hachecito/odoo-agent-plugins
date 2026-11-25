@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 'use strict';
 // Task folders of odoo-squad: .oap/odoo-squad/tasks/<AAAAMMDD-slug>/{task,plan,hallazgos}.md plus a one-line-per-task index.
-// Usage: node tasks.js new --title "..." [--from tarea.md] | status <id> <estado> | list | migrate   [--dir ruta]
+// Usage: node tasks.js new --title "..." [--from task.md] | status <id> <status> | list | migrate   [--dir path]
 const fs = require('fs');
 const path = require('path');
 
-const STATUSES = ['en-curso', 'completada', 'bloqueada', 'abandonada', 'migrada'];
-const INDEX_HEADER = '# Tareas del squad\n\nUna línea por tarea: id · estado · título. La carpeta de cada tarea guarda task.md, aclaraciones.md, plan.md y hallazgos.md.\n\n';
+const STATUSES = ['in-progress', 'completed', 'blocked', 'abandoned', 'migrated'];
+// Spanish statuses from earlier versions are still accepted and mapped to English.
+const LEGACY_STATUSES = { 'en-curso': 'in-progress', completada: 'completed', bloqueada: 'blocked', abandonada: 'abandoned', migrada: 'migrated' };
+const INDEX_HEADER = '# Squad tasks\n\nOne line per task: id · status · title. Each task folder holds task.md, aclaraciones.md (clarifications), plan.md and hallazgos.md (findings).\n\n';
 const LINE_RE = /^- (\S+) · (\S+) · (.*)$/;
-const FINDINGS_HEADER = '# Hallazgos de la tarea\n\nDetalles que solo valen para esta tarea. Lo reutilizable va a .oap/memory.md.\n\n';
+const FINDINGS_HEADER = '# Task findings\n\nDetails that only apply to this task. Reusable lessons go to .oap/memory.md.\n\n';
 
 /**
  * Find the configured repo root (.oap/odoosh-browser/config.json), walking up from a directory.
@@ -43,7 +45,7 @@ function tasksDir(root) {
 function slugify(title) {
   const s = title.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
-  return s || 'tarea';
+  return s || 'task';
 }
 
 /**
@@ -84,7 +86,7 @@ function newTask(root, task) {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'task.md'), task.body || `# ${task.title}\n`, 'utf8');
   fs.writeFileSync(path.join(dir, 'hallazgos.md'), FINDINGS_HEADER, 'utf8');
-  writeIndex(root, [...readIndex(root), { id, status: 'en-curso', title: task.title }]);
+  writeIndex(root, [...readIndex(root), { id, status: 'in-progress', title: task.title }]);
   return { id, dir };
 }
 
@@ -92,10 +94,11 @@ function newTask(root, task) {
  * Change the status of an indexed task.
  * @param {string} root - repo root
  * @param {string} id - task id
- * @param {string} status - one of STATUSES
+ * @param {string} status - one of STATUSES (or a legacy Spanish status)
  * @returns {boolean} true if updated
  */
 function setStatus(root, id, status) {
+  status = LEGACY_STATUSES[status] || status;
   const entries = readIndex(root);
   const hit = entries.find((e) => e.id === id);
   if (!hit || !STATUSES.includes(status)) return false;
@@ -130,7 +133,7 @@ function migrate(root) {
       fs.mkdirSync(path.join(dir, id));
       fs.renameSync(path.join(dir, f), path.join(dir, id, 'task.md'));
       fs.writeFileSync(path.join(dir, id, 'hallazgos.md'), FINDINGS_HEADER, 'utf8');
-      if (!entries.some((e) => e.id === id)) entries.push({ id, status: 'migrada', title: taskTitle(path.join(dir, id, 'task.md')) || id.replace(/^\d{8}-/, '').replace(/-/g, ' ') });
+      if (!entries.some((e) => e.id === id)) entries.push({ id, status: 'migrated', title: taskTitle(path.join(dir, id, 'task.md')) || id.replace(/^\d{8}-/, '').replace(/-/g, ' ') });
       moved.push(id);
     }
   }
@@ -138,7 +141,7 @@ function migrate(root) {
   const oldPlan = path.join(root, '.oap', 'odoo-squad', 'plan.md');
   const last = fs.existsSync(dir) ? fs.readdirSync(dir).filter((x) => fs.statSync(path.join(dir, x)).isDirectory()).sort().pop() : null;
   if (fs.existsSync(oldPlan) && last) {
-    const target = path.join(dir, last, fs.existsSync(path.join(dir, last, 'plan.md')) ? 'plan-anterior.md' : 'plan.md');
+    const target = path.join(dir, last, fs.existsSync(path.join(dir, last, 'plan.md')) ? 'plan-previous.md' : 'plan.md');
     fs.renameSync(oldPlan, target);
     plan = path.relative(root, target);
   }
@@ -162,13 +165,13 @@ function main() {
   const [cmd, ...args] = process.argv.slice(2);
   const root = findRoot(opt(args, 'dir') || process.cwd());
   if (!root) {
-    console.error('No hay .oap/odoosh-browser/config.json: ejecutar primero /odoosh-browser:odoo-project-setup.');
+    console.error('No .oap/odoosh-browser/config.json: run /odoosh-browser:odoo-project-setup first.');
     process.exit(1);
   }
   if (cmd === 'new') {
     const title = opt(args, 'title');
     if (!title) {
-      console.error('Uso: tasks.js new --title "..." [--from tarea.md]');
+      console.error('Usage: tasks.js new --title "..." [--from task.md]');
       process.exit(1);
     }
     const from = opt(args, 'from');
@@ -176,20 +179,20 @@ function main() {
     console.log(JSON.stringify({ id, dir: path.relative(root, dir).split(path.sep).join('/') }));
   } else if (cmd === 'status') {
     if (!setStatus(root, args[0], args[1])) {
-      console.error(`Tarea o estado inválido. Estados: ${STATUSES.join(', ')}`);
+      console.error(`Invalid task or status. Statuses: ${STATUSES.join(', ')}`);
       process.exit(1);
     }
     console.log(`${args[0]}: ${args[1]}`);
   } else if (cmd === 'list') {
     const entries = readIndex(root);
-    console.log(entries.length ? entries.map((e) => `${e.id} · ${e.status} · ${e.title}`).join('\n') : 'Sin tareas.');
+    console.log(entries.length ? entries.map((e) => `${e.id} · ${e.status} · ${e.title}`).join('\n') : 'No tasks.');
   } else if (cmd === 'migrate') {
     const res = migrate(root);
-    res.moved.forEach((id) => console.log(`Movida a carpeta: ${id}`));
-    if (res.plan) console.log(`plan.md movido a ${res.plan}`);
-    if (!res.moved.length && !res.plan) console.log('Nada que migrar.');
+    res.moved.forEach((id) => console.log(`Moved to folder: ${id}`));
+    if (res.plan) console.log(`plan.md moved to ${res.plan}`);
+    if (!res.moved.length && !res.plan) console.log('Nothing to migrate.');
   } else {
-    console.error('Uso: tasks.js new --title "..." [--from tarea.md] | status <id> <estado> | list | migrate  [--dir ruta]');
+    console.error('Usage: tasks.js new --title "..." [--from task.md] | status <id> <status> | list | migrate  [--dir path]');
     process.exit(1);
   }
 }

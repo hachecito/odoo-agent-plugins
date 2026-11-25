@@ -2,9 +2,9 @@
 
 # Odoo Agent Plugins
 
-Plugins de Claude Code que llevan una tarea de Odoo de principio a fin: código y tests, push a una rama staging de Odoo.sh, verificación del build y un informe con evidencias, con salvaguardas que impiden tocar producción.
+Claude Code plugins that take an Odoo task from start to finish: code and tests, push to an Odoo.sh staging branch, build verification and a report with evidence, with safeguards that keep production out of reach.
 
-[![Licencia MIT](https://img.shields.io/badge/licencia-MIT-blue.svg)](LICENSE)
+[![MIT license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-d97757.svg)](https://code.claude.com/docs/en/plugins)
 [![Agent skills](https://img.shields.io/badge/agent-skills-3b82f6.svg)](plugins/)
 [![Node.js >= 18](https://img.shields.io/badge/node-%3E%3D18-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -17,81 +17,81 @@ Plugins de Claude Code que llevan una tarea de Odoo de principio a fin: código 
 
 ## Plugins
 
-| Plugin | Descripción |
+| Plugin | Description |
 |---|---|
-| [odoosh-browser](plugins/odoosh-browser/README.md) | Tareas Odoo de principio a fin sobre una rama staging de Odoo.sh: código y tests, commit, push con confirmación, verificación de build, logs y tests (editor web de Odoo.sh con Claude in Chrome, o SSH) e informe con evidencias. |
-| [odoo-squad](plugins/odoo-squad/README.md) | Squad de agentes autónomos que ejecuta una tarea documentada de principio a fin: planifica, implementa, prueba, corrige, consulta a un advisor y redacta el informe. Requiere `odoosh-browser`. |
+| [odoosh-browser](plugins/odoosh-browser/README.md) | End-to-end Odoo tasks on an Odoo.sh staging branch: code and tests, commit, push with confirmation, build, logs and tests verification (Odoo.sh web editor with Claude in Chrome, or SSH) and a report with evidence. |
+| [odoo-squad](plugins/odoo-squad/README.md) | Squad of autonomous agents that runs a documented task end to end: plans, implements, tests, fixes, consults an advisor and writes the report. Requires `odoosh-browser`. |
 
-## Requisitos
+## Requirements
 
-- [Claude Code](https://code.claude.com/docs) y Node.js 18 o superior.
-- [Claude in Chrome](https://code.claude.com/docs/en/chrome) con sesión iniciada en Odoo.sh, para leer builds y logs y usar el editor web.
-- `git` y, para las pull requests, la CLI `gh` con sesión.
-- SSH a Odoo.sh es opcional y está desactivado por defecto.
+- [Claude Code](https://code.claude.com/docs) and Node.js 18 or later.
+- [Claude in Chrome](https://code.claude.com/docs/en/chrome) logged in to Odoo.sh, to read builds and logs and use the web editor.
+- `git` and, for pull requests, the `gh` CLI logged in.
+- SSH to Odoo.sh is optional and off by default.
 
-## Instalación
+## Installation
 
 ```powershell
-claude plugin marketplace add hachecito/odoo-agent-plugins      # o la ruta local de este repositorio
+claude plugin marketplace add hachecito/odoo-agent-plugins      # or the local path of this repository
 claude plugin install <plugin>@odoo-agent-plugins
 ```
 
-## Uso básico
+## Basic usage
 
-Preparar **una vez por repo** de módulos Odoo (pide la rama staging de Odoo.sh y comprueba Chrome, GitHub y SSH):
+Set up **once per repo** of Odoo modules (asks for the Odoo.sh staging branch and checks Chrome, GitHub and SSH):
 
 ```
 /odoosh-browser:odoo-project-setup
 ```
 
-### odoosh-browser: un agente, una tarea
+### odoosh-browser: one agent, one task
 
-Cuando quieres supervisar de cerca una tarea concreta:
-
-```
-/odoosh-browser:odoo-task Corregir el cálculo de descuentos en sale_custom y añadir un test
-```
-
-Hace código y tests, commit, push a staging (con confirmación), espera el build, lee logs, ejecuta los tests en Odoo.sh y entrega un informe con evidencias.
-
-### odoo-squad: un equipo de agentes, tarea documentada
-
-Cuando quieres delegar la tarea completa. Se le pasa un `.md` (o una descripción):
+When you want to follow a specific task closely:
 
 ```
-/odoo-squad:squad-run tareas/descuentos.md
-/odoo-squad:squad-run "Añadir campo 'referencia cliente' a sale.order y mostrarlo en la vista de lista"
+/odoosh-browser:odoo-task Fix the discount calculation in sale_custom and add a test
 ```
 
-Un planificador, un implementador, un tester, un corrector, un advisor (modelo más potente, solo para decisiones difíciles) y un redactor (borradores de mensajes) trabajan sobre las mismas salvaguardas. Requiere tener instalado `odoosh-browser`.
+It writes code and tests, commits, pushes to staging (with confirmation), waits for the build, reads the logs, runs the tests on Odoo.sh and delivers a report with evidence.
 
-### Utilidades (PowerShell)
+### odoo-squad: a team of agents, documented task
+
+When you want to delegate the whole task. Pass it an `.md` file (or a description):
+
+```
+/odoo-squad:squad-run tasks/discounts.md
+/odoo-squad:squad-run "Add a 'customer reference' field to sale.order and show it in the list view"
+```
+
+A planner, an implementer, a tester, a fixer, an advisor (most capable model, only for hard decisions) and a writer (message drafts) work on top of the same safeguards. Requires `odoosh-browser` installed.
+
+### Utilities (PowerShell)
 
 ```powershell
-node <plugin>\scripts\notes.js show                       # memoria del proyecto (.oap/memory.md)
-node <plugin>\scripts\config.js validate                  # configuración del repo
-node <plugin>\scripts\config.js set-autonomy auto         # push a staging sin confirmar (producción sigue denegada)
-node <plugin>\scripts\config.js set-autonomy yolo         # además Chrome, scripts del plugin y ssh a staging sin confirmar
-node <plugin>\scripts\config.js migrate                   # pasar .claude/ antiguo a .oap/
+node <plugin>\scripts\notes.js show                       # project memory (.oap/memory.md)
+node <plugin>\scripts\config.js validate                  # repo configuration
+node <plugin>\scripts\config.js set-autonomy auto         # push to staging without confirming (production stays denied)
+node <plugin>\scripts\config.js set-autonomy yolo         # also Chrome, plugin scripts and ssh to staging without confirming
+node <plugin>\scripts\config.js migrate                   # move the old .claude/ files to .oap/
 ```
 
-Los dos plugins comparten la carpeta `.oap/` del repo (excluida de git): configuración, estado de la tarea y `memory.md` con lo aprendido.
+Both plugins share the repo's `.oap/` folder (excluded from git): configuration, task state and `memory.md` with what was learned.
 
-## Actualización
+## Updating
 
 ```powershell
 claude plugin marketplace update odoo-agent-plugins
-claude plugin update odoosh-browser@odoo-agent-plugins     # comprobar claude plugin list --> nueva versión
+claude plugin update odoosh-browser@odoo-agent-plugins     # check claude plugin list --> new version
 claude plugin update odoo-squad@odoo-agent-plugins
 ```
 
-## Estructura
+## Structure
 
 ```
-.claude-plugin/marketplace.json   catálogo de plugins de este repositorio
-plugins/<plugin>/                 un plugin por carpeta (plugin.json, skills, agents, hooks, scripts, docs, tests)
+.claude-plugin/marketplace.json   plugin catalogue of this repository
+plugins/<plugin>/                 one plugin per folder (plugin.json, skills, agents, hooks, scripts, docs, tests)
 ```
 
-## Licencia
+## License
 
 [MIT](LICENSE) © 2026 hachecito

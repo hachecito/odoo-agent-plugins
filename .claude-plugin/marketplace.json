@@ -3,17 +3,17 @@
   "owner": {
     "name": "hachecito"
   },
-  "description": "Herramientas de Claude Code para desarrollo Odoo y Odoo.sh.",
+  "description": "Claude Code tools for Odoo and Odoo.sh development.",
   "plugins": [
     {
       "name": "odoosh-browser",
       "source": "./plugins/odoosh-browser",
-      "description": "Agente para tareas Odoo end-to-end sobre ramas staging de Odoo.sh."
+      "description": "Agent for end-to-end Odoo tasks on Odoo.sh staging branches."
     },
     {
       "name": "odoo-squad",
       "source": "./plugins/odoo-squad",
-      "description": "Squad de agentes autónomos (planificador, implementador, tester, corrector, advisor y redactor) para tareas Odoo end-to-end."
+      "description": "Squad of autonomous agents (planner, implementer, tester, fixer, advisor and writer) for end-to-end Odoo tasks."
     }
   ]
 }

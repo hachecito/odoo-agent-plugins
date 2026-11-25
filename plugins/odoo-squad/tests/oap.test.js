@@ -16,7 +16,7 @@ const AGENTS = path.join(__dirname, '..', 'agents');
  * @param {string} version - plugin version
  * @returns {string} install path
  */
-function fakePlugin(base, version = '0.10.0') {
+function fakePlugin(base, version = '0.12.0') {
   const dir = path.join(base, 'odoosh-browser');
   fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
   fs.mkdirSync(path.join(dir, '.claude-plugin'), { recursive: true });
@@ -49,10 +49,10 @@ test('locate: skips odoosh-browser versions older than the minimum', () => {
   const old = fakePlugin(path.join(tmp, 'old'), '0.4.0');
   assert.deepStrictEqual(locate({ OAP_ODOOSH_BROWSER: old }, tmp, tmp), { dir: null, old: '0.4.0' });
   const sibling = path.join(tmp, 'plugins');
-  fakePlugin(sibling, '0.10.0');
+  fakePlugin(sibling, '0.12.0');
   const res = locate({ OAP_ODOOSH_BROWSER: old }, tmp, path.join(sibling, 'odoo-squad', 'scripts'));
   assert.strictEqual(res.dir, path.join(sibling, 'odoosh-browser', 'scripts'));
-  assert.ok(compareVersions('0.10.1', MIN_VERSION) > 0 && compareVersions('0.9.1', MIN_VERSION) < 0 && compareVersions('0.10.0', MIN_VERSION) === 0);
+  assert.ok(compareVersions('0.12.1', MIN_VERSION) > 0 && compareVersions('0.11.0', MIN_VERSION) < 0 && compareVersions('0.12.0', MIN_VERSION) === 0);
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
@@ -61,12 +61,12 @@ test('oap.js: runs odoosh-browser scripts with or without .js, rejects anything 
   const env = { ...process.env, OAP_ODOOSH_BROWSER: path.join(__dirname, '..', '..', 'odoosh-browser') };
   const ok = spawnSync(process.execPath, [OAP, 'notes.js', 'show'], { cwd: os.tmpdir(), encoding: 'utf8', env });
   assert.strictEqual(ok.status, 1); // no config in a temp dir: the script ran and reported it
-  assert.ok(/No hay \.oap/.test(ok.stderr), ok.stderr);
+  assert.ok(/odoosh-browser\/config\.json/.test(ok.stderr), ok.stderr);
   const short = spawnSync(process.execPath, [OAP, 'notes', 'show'], { cwd: os.tmpdir(), encoding: 'utf8', env });
-  assert.ok(/No hay \.oap/.test(short.stderr), short.stderr);
+  assert.ok(/odoosh-browser\/config\.json/.test(short.stderr), short.stderr);
   for (const bad of ['../x.js', 'a/b.js', '../x', 'nonexistent']) {
     const res = spawnSync(process.execPath, [OAP, bad], { encoding: 'utf8', env });
-    assert.ok(res.status !== 0 && /Uso:/.test(res.stderr), bad);
+    assert.ok(res.status !== 0 && /Usage:/.test(res.stderr), bad);
   }
 });
 

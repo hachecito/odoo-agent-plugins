@@ -98,17 +98,17 @@ function loadConfig(startDir) {
  */
 function validateConfig(config) {
   const problems = [];
-  if (!config.staging_branch) problems.push('staging_branch no definida: preguntar al usuario.');
+  if (!config.staging_branch) problems.push('staging_branch is not set: ask the user.');
   if (!Array.isArray(config.production_branches) || !config.production_branches.length) {
-    problems.push('production_branches debe ser una lista no vacía.');
+    problems.push('production_branches must be a non-empty list.');
   }
   if (config.staging_branch && (config.production_branches || []).includes(config.staging_branch)) {
-    problems.push('staging_branch no puede ser una rama de producción.');
+    problems.push('staging_branch cannot be a production branch.');
   }
   if (!['confirm', 'auto'].includes(config.autonomy && config.autonomy.push_staging)) {
-    problems.push('autonomy.push_staging debe ser "confirm" o "auto".');
+    problems.push('autonomy.push_staging must be "confirm" or "auto".');
   }
-  if (typeof (config.autonomy && config.autonomy.yolo) !== 'boolean') problems.push('autonomy.yolo debe ser true o false.');
+  if (typeof (config.autonomy && config.autonomy.yolo) !== 'boolean') problems.push('autonomy.yolo must be true or false.');
   return problems;
 }
 

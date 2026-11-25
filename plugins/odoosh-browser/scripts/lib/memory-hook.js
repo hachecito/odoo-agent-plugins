@@ -6,7 +6,7 @@ const { loadRun, saveRun, isRunActive } = require('./run');
 
 const FAILURE_HINT_EVERY_MS = 10 * 60 * 1000;
 const NOTES_JS = path.resolve(__dirname, '..', 'notes.js').split(path.sep).join('/');
-const ADD_CMD = `node "${NOTES_JS}" add [--tag t] --text "creía X, en realidad Y" --source "<tarea>"`;
+const ADD_CMD = `node "${NOTES_JS}" add [--tag t] --text "I thought X, actually Y" --source "<task>"`;
 
 /**
  * Tell whether memory.md was written since the run started.
@@ -38,8 +38,8 @@ function decide(event, deps) {
     saveRun(loaded.root, run);
     return {
       decision: 'block',
-      reason: `[odoosh-browser] Antes de terminar: ¿algo de esta tarea resultó distinto de lo esperado (comando que falló, ruta, test lento, rareza del editor u Odoo.sh)? `
-        + `Si lo comprobaste y servirá en otras tareas del proyecto, anótalo (0 a 5 líneas) con ${ADD_CMD}. Los detalles que solo valen para esta tarea no van a la memoria. Si no hay nada que anotar, termina sin más.`,
+      reason: `[odoosh-browser] Before finishing: did anything in this task turn out different from what you expected (a failing command, a path, a slow test, an editor or Odoo.sh quirk)? `
+        + `If you verified it and it will help other tasks in this project, record it (0 to 5 lines) with ${ADD_CMD}. Details that only matter for this task do not go to memory. If there is nothing to record, just finish.`,
     };
   }
 
@@ -52,7 +52,7 @@ function decide(event, deps) {
       return {
         hookSpecificOutput: {
           hookEventName: 'PostToolUseFailure',
-          additionalContext: '[odoosh-browser] Si resuelves este fallo y la causa no era la esperada, inclúyelo como [LECCIÓN] en tu respuesta al orquestador (no uses notes.js).',
+          additionalContext: '[odoosh-browser] If you solve this failure and the cause was not the expected one, include it as [LESSON] in your answer to the orchestrator (do not use notes.js).',
         },
       };
     }
@@ -62,7 +62,7 @@ function decide(event, deps) {
     return {
       hookSpecificOutput: {
         hookEventName: 'PostToolUseFailure',
-        additionalContext: `[odoosh-browser] Si resuelves este fallo y la causa no era la esperada, anótalo en el momento con ${ADD_CMD}.`,
+        additionalContext: `[odoosh-browser] If you solve this failure and the cause was not the expected one, record it right away with ${ADD_CMD}.`,
       },
     };
   }

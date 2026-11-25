@@ -19,7 +19,7 @@ function tmpRepo() {
 
 test('slugify: accents, symbols and length', () => {
   assert.strictEqual(slugify('Vistas y menús: corrección #2'), 'vistas-y-menus-correccion-2');
-  assert.strictEqual(slugify('!!!'), 'tarea');
+  assert.strictEqual(slugify('!!!'), 'task');
   assert.ok(slugify('x'.repeat(80)).length <= 40);
 });
 
@@ -32,10 +32,11 @@ test('newTask: folder with task, findings and index line; unique ids; status upd
   assert.strictEqual(b.id, '20260102-campo-nuevo-2');
   assert.strictEqual(fs.readFileSync(path.join(a.dir, 'task.md'), 'utf8'), '# Tarea\ntexto');
   assert.ok(fs.existsSync(path.join(a.dir, 'hallazgos.md')));
-  assert.strictEqual(setStatus(root, a.id, 'completada'), true);
-  assert.strictEqual(setStatus(root, a.id, 'hecha'), false);
-  assert.strictEqual(setStatus(root, 'no-existe', 'completada'), false);
-  assert.deepStrictEqual(readIndex(root).map((e) => [e.id, e.status]), [[a.id, 'completada'], [b.id, 'en-curso']]);
+  assert.strictEqual(setStatus(root, a.id, 'completed'), true);
+  assert.strictEqual(setStatus(root, a.id, 'done'), false);
+  assert.strictEqual(setStatus(root, 'missing', 'completed'), false);
+  assert.strictEqual(setStatus(root, b.id, 'bloqueada'), true); // legacy Spanish status is mapped
+  assert.deepStrictEqual(readIndex(root).map((e) => [e.id, e.status]), [[a.id, 'completed'], [b.id, 'blocked']]);
   fs.rmSync(root, { recursive: true, force: true });
 });
 
@@ -52,7 +53,7 @@ test('migrate: 0.1.0 flat tasks and shared plan.md move into task folders', () =
   assert.ok(fs.readFileSync(path.join(dir, '20260101-uno', 'task.md'), 'utf8').includes('# Corregir vista de pedidos'));
   assert.ok(fs.existsSync(path.join(dir, '20260105-dos', 'hallazgos.md')));
   assert.deepStrictEqual(readIndex(root).map((e) => e.title), ['Corregir vista de pedidos', 'dos']);
-  assert.deepStrictEqual(readIndex(root).map((e) => e.status), ['migrada', 'migrada']);
+  assert.deepStrictEqual(readIndex(root).map((e) => e.status), ['migrated', 'migrated']);
   assert.deepStrictEqual(migrate(root), { moved: [], plan: null }); // idempotent
   fs.rmSync(root, { recursive: true, force: true });
 });

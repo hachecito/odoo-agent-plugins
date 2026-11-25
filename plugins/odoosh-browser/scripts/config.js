@@ -30,7 +30,7 @@ function main() {
 
   if (cmd === 'init') {
     if (loaded && !opts.force) {
-      console.log(`Ya existe: ${loaded.path}`);
+      console.log(`Already exists: ${loaded.path}`);
       process.exit(0);
     }
     const config = {
@@ -42,14 +42,14 @@ function main() {
     };
     const target = path.join(dir, CONFIG_REL);
     saveConfig(target, config);
-    console.log(`Creado: ${target}`);
+    console.log(`Created: ${target}`);
     const ex = ensureExcluded(dir);
-    if (ex.excluded.length) console.log(`Añadido a ${ex.excludeFile}: ${ex.excluded.join(', ')}`);
+    if (ex.excluded.length) console.log(`Added to ${ex.excludeFile}: ${ex.excluded.join(', ')}`);
     printProblems(validateConfig(config));
     return;
   }
   if (!loaded) {
-    console.error(`No existe ${CONFIG_REL} en ${dir} ni en directorios superiores. Ejecutar "init".`);
+    console.error(`No ${CONFIG_REL} in ${dir} or any parent directory. Run "init".`);
     process.exit(1);
   }
   if (cmd === 'show') {
@@ -57,24 +57,24 @@ function main() {
   } else if (cmd === 'validate') {
     const problems = validateConfig(loaded.config);
     printProblems(problems);
-    if (loaded.legacy) console.log('Aviso: archivos en ubicación antigua (.claude/). Ejecutar "config.js migrate" para pasarlos a .oap/.');
+    if (loaded.legacy) console.log('Warning: files in the old location (.claude/). Run "config.js migrate" to move them to .oap/.');
     process.exit(problems.length ? 1 : 0);
   } else if (cmd === 'migrate') {
     const res = migrateLegacy(loaded.root);
-    res.moved.forEach((r) => console.log(`Movido: ${r}`));
-    res.skipped.forEach((r) => console.log(`Sin cambios (ya existe el destino): ${r}`));
-    if (res.notes) console.log(`Notas convertidas a .oap/memory.md: ${res.notes}`);
-    if (res.excludeFile) console.log(res.excluded.length ? `Añadido a ${res.excludeFile}: ${res.excluded.join(', ')}` : '.git/info/exclude ya incluía .oap/.');
-    else console.log('No se encontró .git/info/exclude: excluir a mano .oap/ del control de versiones.');
-    if (!res.moved.length && !res.skipped.length && !res.notes) console.log('No había archivos antiguos que migrar.');
+    res.moved.forEach((r) => console.log(`Moved: ${r}`));
+    res.skipped.forEach((r) => console.log(`Unchanged (target already exists): ${r}`));
+    if (res.notes) console.log(`Notes converted to .oap/memory.md: ${res.notes}`);
+    if (res.excludeFile) console.log(res.excluded.length ? `Added to ${res.excludeFile}: ${res.excluded.join(', ')}` : '.git/info/exclude already had .oap/.');
+    else console.log('No .git/info/exclude found: exclude .oap/ from version control by hand.');
+    if (!res.moved.length && !res.skipped.length && !res.notes) console.log('No old files to migrate.');
   } else if (cmd === 'set-staging') {
     const branch = rest[0];
     if (!branch || branch.startsWith('--')) {
-      console.error('Uso: config.js set-staging <rama>');
+      console.error('Usage: config.js set-staging <branch>');
       process.exit(1);
     }
     if (loaded.config.production_branches.includes(branch)) {
-      console.error(`"${branch}" está declarada como rama de producción; no puede ser staging.`);
+      console.error(`"${branch}" is declared as a production branch; it cannot be staging.`);
       process.exit(1);
     }
     saveConfig(loaded.path, { ...loaded.config, staging_branch: branch });
@@ -82,7 +82,7 @@ function main() {
   } else if (cmd === 'set-autonomy') {
     const mode = rest[0];
     if (!['confirm', 'auto', 'yolo'].includes(mode)) {
-      console.error('Uso: config.js set-autonomy confirm|auto|yolo  (auto: push a staging sin confirmación; yolo: además scripts del plugin, Chrome y ssh a builds de desarrollo sin confirmación; producción sigue denegada)');
+      console.error('Usage: config.js set-autonomy confirm|auto|yolo  (auto: push to staging without confirmation; yolo: also plugin scripts, Chrome and ssh to dev builds without confirmation; production stays denied)');
       process.exit(1);
     }
     const autonomy = { push_staging: mode === 'confirm' ? 'confirm' : 'auto', yolo: mode === 'yolo' };
@@ -90,9 +90,9 @@ function main() {
     console.log(`autonomy = ${JSON.stringify(autonomy)}`);
   } else if (cmd === 'set-ssh') {
     saveConfig(loaded.path, { ...loaded.config, ssh: { ...loaded.config.ssh, enabled: opts.enabled !== 'false', key: opts.key || loaded.config.ssh.key } });
-    console.log('ssh actualizado');
+    console.log('ssh updated');
   } else {
-    console.error('Uso: config.js init|show|validate|migrate|set-staging <rama>|set-autonomy confirm|auto|yolo|set-ssh --enabled true|false [--key ruta] [--dir ruta]');
+    console.error('Usage: config.js init|show|validate|migrate|set-staging <branch>|set-autonomy confirm|auto|yolo|set-ssh --enabled true|false [--key path] [--dir path]');
     process.exit(1);
   }
 }
@@ -102,7 +102,7 @@ function main() {
  * @param {string[]} problems - validation messages
  */
 function printProblems(problems) {
-  if (!problems.length) console.log('Configuración válida.');
+  if (!problems.length) console.log('Configuration is valid.');
   else problems.forEach((p) => console.log(`- ${p}`));
 }
 

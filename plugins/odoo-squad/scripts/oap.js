@@ -8,7 +8,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 // odoo-squad relies on .oap/, autonomy (yolo) and the subagent rules of this odoosh-browser version.
-const MIN_VERSION = '0.10.0';
+const MIN_VERSION = '0.12.0';
 
 /**
  * Read the version of a plugin folder.
@@ -57,7 +57,7 @@ function locate(env = process.env, home = os.homedir(), here = __dirname) {
   candidates.push(path.resolve(here, '..', '..', 'odoosh-browser'));
   const found = candidates.filter((c) => c && fs.existsSync(path.join(c, 'scripts', 'run-state.js')));
   const hit = found.find((c) => compareVersions(pluginVersion(c) || '0', MIN_VERSION) >= 0);
-  return { dir: hit ? path.join(hit, 'scripts') : null, old: !hit && found.length ? (pluginVersion(found[0]) || 'desconocida') : null };
+  return { dir: hit ? path.join(hit, 'scripts') : null, old: !hit && found.length ? (pluginVersion(found[0]) || 'unknown') : null };
 }
 
 /**
@@ -79,8 +79,8 @@ function main() {
   const { dir, old } = locate();
   if (!dir) {
     console.error(old
-      ? `odoosh-browser ${old} es anterior a la ${MIN_VERSION} que necesita odoo-squad: claude plugin marketplace update odoo-agent-plugins y claude plugin update odoosh-browser@odoo-agent-plugins`
-      : 'odoosh-browser no está instalado: claude plugin install odoosh-browser@odoo-agent-plugins');
+      ? `odoosh-browser ${old} is older than the ${MIN_VERSION} odoo-squad needs: claude plugin marketplace update odoo-agent-plugins and claude plugin update odoosh-browser@odoo-agent-plugins`
+      : 'odoosh-browser is not installed: claude plugin install odoosh-browser@odoo-agent-plugins');
     process.exit(2);
   }
   if (script === '--where') {
@@ -88,7 +88,7 @@ function main() {
     return;
   }
   if (!/^[a-z-]+\.js$/.test(script || '') || !fs.existsSync(path.join(dir, script))) {
-    console.error('Uso: oap.js <run-state|notes|config|report|ssh-check>[.js] [args...]');
+    console.error('Usage: oap.js <run-state|notes|config|report|ssh-check>[.js] [args...]');
     process.exit(1);
   }
   const res = spawnSync(process.execPath, [path.join(dir, script), ...args], { stdio: 'inherit' });

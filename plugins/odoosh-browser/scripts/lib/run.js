@@ -68,10 +68,10 @@ function verdict(run) {
   const missing = REQUIRED_EVIDENCE.filter((k) => !latest[k]);
   const failed = Object.values(latest).filter((e) => e.status === 'fail').map((e) => e.kind);
   const skipped = Object.values(latest).filter((e) => e.status === 'skipped').map((e) => e.kind);
-  let v = 'COMPLETADA';
-  if (run.state === 'BLOCKED') v = 'BLOQUEADA';
-  else if (failed.length || run.state === 'FAILED') v = 'FALLIDA';
-  else if (missing.length || skipped.length) v = 'PARCIALMENTE VERIFICADA';
+  let v = 'COMPLETE';
+  if (run.state === 'BLOCKED') v = 'BLOCKED';
+  else if (failed.length || run.state === 'FAILED') v = 'FAILED';
+  else if (missing.length || skipped.length) v = 'PARTIALLY VERIFIED';
   return { verdict: v, missing, failed, skipped };
 }
 

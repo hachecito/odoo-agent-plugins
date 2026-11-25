@@ -1,85 +1,85 @@
-# Prueba rápida con parche en el build staging (antes del push)
+# Quick patch test on the staging build (before the push)
 
-Probar un cambio en el build staging que ya está en marcha, sin commit ni push ni esperar un build: se aplican los cambios locales en `~/src/user` del build, se lanzan los tests y se deshace. Lo que se entrega sigue siendo lo que construye Odoo.sh tras el push: esta prueba **no sustituye** a `remote_build` ni a `remote_tests`.
+Try a change on the running staging build without commit, push or waiting for a build: the local changes are applied in the build's `~/src/user`, the tests run and the change is undone. What is delivered is still what Odoo.sh builds after the push: this test does **not replace** `remote_build` or `remote_tests`.
 
-## Reglas
+## Rules
 
-- Solo en el build **staging** de la tarea (`*.dev.odoo.com`), solo en `~/src/user`. Nunca en `~/src/odoo` ni `~/src/enterprise`, nunca en producción.
-- **El código manda en local**: el cambio se hace primero en el repo local y se lleva al build tal cual. Si se edita en el editor, el resultado debe coincidir con el local (comprobación de hashes, abajo).
-- **Staging es compartido**: el `-u` de los tests cambia su base de datos y guardar un `.py` en el editor reinicia el servidor. Avisar al usuario la primera vez en cada tarea.
-- **Deshacer siempre**: antes del push y al cerrar la tarea (completada, bloqueada o abandonada). El siguiente build lo descarta, pero mientras tanto staging ejecuta código que no está en git.
-- Evidencia propia: `run-state.js evidence --kind hotpatch_tests ...`. Nunca registrarla como `remote_tests`.
-- **Verificado en un build staging de Odoo 18 (noviembre de 2026)**: `~/src/user` es un checkout de git en el commit del build, con permisos de escritura, `git` 2.43 y `base64`; el parche en base64 escrito en el terminal web se aplicó con los mismos `git hash-object` que en local, y `git apply -R` lo deshizo por completo, incluidos los archivos y carpetas nuevos. Comprobarlo igualmente en el primer uso de cada proyecto (`git -C ~/src/user rev-parse HEAD`). Si algún build no fuera un checkout de git: `git apply` funciona también fuera de un repositorio, y en vez de `git status` se comprueba con el propio parche: `git apply -R --check ~/oap-hotpatch.patch` termina bien si el parche **sigue aplicado**, y si no queda `~/oap-hotpatch.patch` no hay parche del agente.
+- Only on the task's **staging** build (`*.dev.odoo.com`), only in `~/src/user`. Never in `~/src/odoo` or `~/src/enterprise`, never on production.
+- **Local code rules**: the change is made first in the local repo and taken to the build as is. If it is edited in the editor, the result must match the local one (hash check, below).
+- **Staging is shared**: the tests' `-u` changes its database and saving a `.py` in the editor restarts the server. Tell the user the first time in each task.
+- **Always undo**: before the push and when closing the task (completed, blocked or abandoned). The next build discards it, but meanwhile staging runs code that is not in git.
+- Its own evidence: `run-state.js evidence --kind hotpatch_tests ...`. Never record it as `remote_tests`.
+- **Verified on an Odoo 18 staging build (November 2026)**: `~/src/user` is a git checkout at the build's commit, writable, with `git` 2.43 and `base64`; the base64 patch typed in the web terminal applied with the same `git hash-object` as locally, and `git apply -R` undid it completely, including new files and folders. Check it anyway on first use in each project (`git -C ~/src/user rev-parse HEAD`). If a build were not a git checkout: `git apply` also works outside a repository, and instead of `git status` check with the patch itself: `git apply -R --check ~/oap-hotpatch.patch` succeeds if the patch **is still applied**, and if no `~/oap-hotpatch.patch` is left there is no agent patch.
 
-## 1. Preparar el parche (local)
+## 1. Prepare the patch (local)
 
-1. SHA del build: `git -C ~/src/user rev-parse --short=12 HEAD` por SSH o en el terminal del editor (12 caracteres se leen mejor en una captura), o el commit que muestra la rama en Odoo.sh. Si no existe en local, `git fetch`.
-2. `node <plugin>/scripts/hotpatch.js prepare --base <sha>` (añadir `--only <ruta>` para un parche parcial, por ejemplo solo los tests). Genera en `.oap/odoosh-browser/hotpatch/`:
-   - `patch.diff`: commits locales sin subir, cambios sin commit y archivos nuevos respecto al build;
-   - `patch.b64`: el mismo parche en base64, para escribirlo en el terminal web;
-   - `manifest.json`: archivos y su `git hash-object`.
-   Imprime los comandos exactos para SSH y para el editor. No se conecta al build.
-3. **Revisar la lista de archivos antes de aplicar.** El parche completo incluye todo lo que git no ignora, también archivos sueltos sin seguimiento (scripts de prueba, un `odoo.conf`, `.env`…), que el script lista aparte. Si aparece algo fuera de los módulos de la tarea, repetir con `--only <modulo> [--only <modulo>...]`. Nunca llevar al build archivos con credenciales o datos de clientes.
+1. Build SHA: `git -C ~/src/user rev-parse --short=12 HEAD` over SSH or in the editor terminal (12 characters read better in a screenshot), or the commit the branch shows on Odoo.sh. If it does not exist locally, `git fetch`.
+2. `node <plugin>/scripts/hotpatch.js prepare --base <sha>` (add `--only <path>` for a partial patch, e.g. only the tests). It writes to `.oap/odoosh-browser/hotpatch/`:
+   - `patch.diff`: unpushed local commits, uncommitted changes and new files relative to the build;
+   - `patch.b64`: the same patch in base64, to type in the web terminal;
+   - `manifest.json`: files and their `git hash-object`.
+   It prints the exact commands for SSH and for the editor. It does not connect to the build.
+3. **Review the file list before applying.** The full patch includes everything git does not ignore, also loose untracked files (test scripts, an `odoo.conf`, `.env`…), which the script lists separately. If anything outside the task's modules shows up, repeat with `--only <module> [--only <module>...]`. Never take files with credentials or client data to the build.
 
-## 2a. Aplicar por SSH (solo si `ssh.enabled` y respondió)
+## 2a. Apply over SSH (only if `ssh.enabled` and it answered)
 
-Con `ssh.enabled` y el host del build; `ssh <build>` abrevia `ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new <build_id>@<build_domain>` (`SKILL.md`, Datos de contexto). En Windows, con la herramienta **Bash** (Git Bash): PowerShell 5.1 no admite la redirección `<` y pasar el parche por una tubería de PowerShell lo recodifica y lo estropea.
+With `ssh.enabled` and the build host; `ssh <build>` abbreviates `ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new <build_id>@<build_domain>` (`SKILL.md`, Context). On Windows, with the **Bash** tool (Git Bash): PowerShell 5.1 does not support `<` redirection and piping the patch through PowerShell re-encodes and breaks it.
 ```bash
-ssh <build> "cd ~/src/user && git rev-parse HEAD && git status --porcelain"     # HEAD = base; sin cambios ajenos
+ssh <build> "cd ~/src/user && git rev-parse HEAD && git status --porcelain"     # HEAD = base; no foreign changes
 ssh <build> "cat > ~/oap-hotpatch.patch && cd ~/src/user && git apply --check ~/oap-hotpatch.patch && git apply ~/oap-hotpatch.patch" < .oap/odoosh-browser/hotpatch/patch.diff
-ssh <build> "cd ~/src/user && git hash-object <archivos> | cut -c1-12"           # igual que el manifest
+ssh <build> "cd ~/src/user && git hash-object <files> | cut -c1-12"           # same as the manifest
 ```
-Si `git status --porcelain` no sale vacío, otra persona o un parche anterior han dejado cambios: no aplicar encima; preguntar al usuario. Si SSH falla por cualquier motivo, seguir por el editor el resto de la tarea, sin reintentar (`SKILL.md`, Canales).
+If `git status --porcelain` is not empty, someone else or an earlier patch left changes: do not apply on top; ask the user. If SSH fails for any reason, continue through the editor for the rest of the task, without retrying (`SKILL.md`, Channels).
 
-## 2b. Aplicar por el editor (canal principal)
+## 2b. Apply through the editor (main channel)
 
-Abrir `https://<build>/odoo-sh/editor` y un terminal (*File → New → Terminal*). Leer [editor-jupyterlab.md](editor-jupyterlab.md) §5 para leer la salida del terminal (solo con capturas).
+Open `https://<build>/odoo-sh/editor` and a terminal (*File → New → Terminal*). Read [editor-jupyterlab.md](editor-jupyterlab.md) §5 for reading terminal output.
 
-**Todo por el terminal**: tiene escritura en `~/src/user`, así que crear y modificar archivos con comandos (`mkdir -p`, `cat`/`base64 -d` con heredoc, `sed -i`) es más barato y fiable que el editor de archivos: no hay clics ni autoindentado, y el resultado se comprueba en el mismo terminal. Orden de preferencia: A, después B; el editor de archivos (C) solo si el terminal no está disponible.
+**Everything through the terminal**: it can write to `~/src/user`, so creating and changing files with commands (`mkdir -p`, `cat`/`base64 -d` with a heredoc, `sed -i`) is cheaper and more reliable than the file editor: no clicks or auto-indent, and the result is checked in the same terminal. Order of preference: A, then B; the file editor (C) only if the terminal is unavailable.
 
-**Opción A — parche completo (preferente).** Escribir el contenido de `patch.b64` entre estas líneas:
+**Option A — full patch (preferred).** Type the content of `patch.b64` between these lines:
 ```bash
 base64 -d > ~/oap-hotpatch.patch <<'OAP_EOF'
-<líneas de patch.b64>
+<lines of patch.b64>
 OAP_EOF
 cd ~/src/user && git status --porcelain && git apply --check ~/oap-hotpatch.patch && git apply ~/oap-hotpatch.patch
-git hash-object <archivos> | cut -c1-12
+git hash-object <files> | cut -c1-12
 ```
-Se usa base64 porque no lleva tabuladores (que el terminal tomaría como autocompletado) ni texto de código que el guard pueda confundir con un comando prohibido.
+Base64 is used because it has no tabs (which the terminal would take as autocomplete) and no code text the guard could mistake for a forbidden command.
 
-**Opción B — archivo a archivo en el terminal** (un archivo nuevo o un cambio pequeño, o si `git apply` falla). Verificado: un archivo escrito con `base64 -d` conserva los tabuladores y `sed -i` cambia la línea; el hash coincide con el local. Con el contenido del archivo local:
+**Option B — file by file in the terminal** (a new file or a small change, or if `git apply` fails). Verified: a file written with `base64 -d` keeps its tabs and `sed -i` changes the line; the hash matches the local one. With the content of the local file:
 ```bash
-mkdir -p ~/src/user/<modulo>/tests
-base64 -d > ~/src/user/<ruta> <<'OAP_EOF'      # contenido completo del archivo local en base64
-<base64 del archivo>
+mkdir -p ~/src/user/<module>/tests
+base64 -d > ~/src/user/<path> <<'OAP_EOF'      # full content of the local file in base64
+<base64 of the file>
 OAP_EOF
-sed -i 's/<texto exacto>/<nuevo>/' ~/src/user/<ruta>   # solo para una línea sencilla
-cd ~/src/user && git hash-object <ruta> | cut -c1-12    # igual que el manifest
+sed -i 's/<exact text>/<new>/' ~/src/user/<path>   # only for a simple line
+cd ~/src/user && git hash-object <path> | cut -c1-12    # same as the manifest
 ```
-- Para el archivo completo, base64 mejor que texto plano: el código Python lleva sangrías y, a veces, tabuladores o texto (por ejemplo SQL en `cr.execute`) que el terminal o el guard interpretarían mal.
-- Nada de editores interactivos (`nano`, `vim`): se manejan a ciegas por capturas y no se puede comprobar lo escrito hasta salir.
-- **[no verificado]** si escribir un `.py` desde el terminal reinicia el servidor como al guardar en el editor. Para los tests no importa: se lanzan en un proceso aparte.
+- For a whole file, base64 beats plain text: Python code has indentation and sometimes tabs or text (e.g. SQL in `cr.execute`) that the terminal or the guard would misread.
+- No interactive editors (`nano`, `vim`): they are driven blind through screenshots and what was written cannot be checked until exiting.
+- **[unverified]** whether writing a `.py` from the terminal restarts the server as saving in the editor does. It does not matter for tests: they run in a separate process.
 
-**Opción C — editor de archivos (último recurso).**
-1. Abrir el archivo con `https://<build>/odoo-sh/editor/lab/tree/src/user/<ruta>`. Archivo nuevo: navegar a su carpeta, *File → New → Text File* (o *Python File*) y renombrarlo con su nombre real (clic derecho en la pestaña o en el explorador → *Rename*).
-2. Editar. **[no verificado]** el editor puede autoindentar y cerrar paréntesis o comillas al escribir: revisar el resultado antes de guardar.
-3. **Guardar siempre**: `Ctrl+S` o *File → Save*. Sin guardar, el cambio no existe en disco y el test probaría el código anterior. Guardar un `.py` reinicia el servidor de staging.
-4. Comprobar desde el terminal que lo guardado coincide con el local: `cd ~/src/user && git hash-object <archivo> | cut -c1-12` contra el `manifest.json`. Una pestaña sin marca de cambios no basta.
+**Option C — file editor (last resort).**
+1. Open the file with `https://<build>/odoo-sh/editor/lab/tree/src/user/<path>`. New file: navigate to its folder, *File → New → Text File* (or *Python File*) and rename it to its real name (right click on the tab or in the file browser → *Rename*).
+2. Edit. **[unverified]** the editor may auto-indent and close brackets or quotes while typing: check the result before saving.
+3. **Always save**: `Ctrl+S` or *File → Save*. Unsaved, the change does not exist on disk and the test would try the old code. Saving a `.py` restarts the staging server.
+4. Check from the terminal that what was saved matches the local file: `cd ~/src/user && git hash-object <file> | cut -c1-12` against `manifest.json`. A tab without a modified mark is not enough.
 
-## 3. Probar
+## 3. Test
 
-Con el parche aplicado, lanzar los tests en un proceso aparte, como en [tests.md](tests.md): lee el código parcheado sin reiniciar el servidor.
+With the patch applied, run the tests in a separate process, as in [tests.md](tests.md): it reads the patched code without restarting the server.
 ```bash
-odoo-bin -d "$PGDATABASE" -u <modulo> --stop-after-init --no-http --test-enable --test-tags /<modulo>:<Clase>.<metodo> --logfile=/tmp/agent-tests.log --log-level=test
+odoo-bin -d "$PGDATABASE" -u <module> --stop-after-init --no-http --test-enable --test-tags /<module>:<Class>.<method> --logfile=/tmp/agent-tests.log --log-level=test
 grep -n 'FAIL:\|ERROR:\|tests.result\|Ran ' /tmp/agent-tests.log | tail -n 40
 ```
-Para un test de regresión: primero un parche solo con la carpeta de tests del módulo (`--only <modulo>/tests`, para que vaya también `tests/__init__.py`) y debe **fallar**; después deshacer, preparar el parche completo y debe **pasar**. Solo cuenta como rojo si se ejecutan N > 0 tests y el de regresión falla en su aserción; 0 tests, un `ImportError` o un error al cargar el módulo no reproducen nada.
+For a regression test: first a patch with only the module's tests folder (`--only <module>/tests`, so `tests/__init__.py` goes too) and it must **fail**; then undo, prepare the full patch and it must **pass**. It only counts as red if N > 0 tests run and the regression test fails on its assertion; 0 tests, an `ImportError` or a module load error reproduce nothing.
 
-Registrar `hotpatch_tests` con el SHA base, el parche (`--only` o completo), el comando, N tests y el resultado.
+Record `hotpatch_tests` with the base SHA, the patch (`--only` or full), the command, N tests and the result.
 
-## 4. Deshacer
+## 4. Undo
 
 ```bash
 cd ~/src/user && git apply -R ~/oap-hotpatch.patch && git status --porcelain && rm ~/oap-hotpatch.patch
 ```
-Por SSH, el mismo comando dentro de `ssh <build> "..."`. Si se cambiaron archivos uno a uno (opciones B o C) sin parche, `git checkout -- <archivos>` y borrar los archivos nuevos con `rm <archivo>` (sin `-rf`). Antes de un parche nuevo, deshacer el anterior.
+Over SSH, the same command inside `ssh <build> "..."`. If files were changed one by one (options B or C) without a patch, `git checkout -- <files>` and delete new files with `rm <file>` (no `-rf`). Before a new patch, undo the previous one.

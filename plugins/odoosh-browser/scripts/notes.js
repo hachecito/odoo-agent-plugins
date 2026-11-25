@@ -20,7 +20,7 @@ function main() {
   const [cmd, ...args] = process.argv.slice(2);
   const loaded = loadConfig(opt(args, 'dir') || process.cwd());
   if (!loaded) {
-    console.error('No hay .oap/odoosh-browser/config.json: ejecutar primero la skill odoo-project-setup.');
+    console.error('No .oap/odoosh-browser/config.json: run the odoo-project-setup skill first.');
     process.exit(1);
   }
   const root = loaded.root;
@@ -29,18 +29,18 @@ function main() {
   } else if (cmd === 'add') {
     const res = addNote(root, { tag: opt(args, 'tag') || opt(args, 'section'), text: opt(args, 'text') || '', source: opt(args, 'source') });
     if (!res.added) {
-      console.error(`Nota no añadida: ${res.reason}`);
+      console.error(`Note not added: ${res.reason}`);
       process.exit(1);
     }
-    console.log('Nota añadida.');
+    console.log('Note added.');
   } else if (cmd === 'remove') {
     if (!removeNote(root, Number(args[0]))) {
-      console.error('Índice inválido.');
+      console.error('Invalid index.');
       process.exit(1);
     }
-    console.log('Nota eliminada.');
+    console.log('Note removed.');
   } else {
-    console.error(`Uso: notes.js show [--tag etiqueta] | add [--tag etiqueta] --text "..." [--source "..."] | remove <n>`);
+    console.error(`Usage: notes.js show [--tag tag] | add [--tag tag] --text "..." [--source "..."] | remove <n>`);
     process.exit(1);
   }
 }

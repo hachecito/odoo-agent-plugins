@@ -1,50 +1,50 @@
-# Diagnóstico con datos del staging (`odoo-bin shell`, solo lectura)
+# Diagnostics with staging data (`odoo-bin shell`, read-only)
 
-Para entender un fallo con los datos reales del build staging antes de tocar código: leer registros, calcular un campo, contar los casos afectados o, con el OK del usuario, llamar al método que falla y ver su traceback. Sirve para encontrar la causa y escribir un test de regresión que la reproduzca; no sustituye a ese test ni a `remote_tests`.
+To understand a failure with the real data of the staging build before touching code: read records, compute a field, count affected cases or, with the user's OK, call the failing method and see its traceback. It helps find the cause and write a regression test that reproduces it; it does not replace that test or `remote_tests`.
 
-## Reglas
+## Rules
 
-- Solo en el build **staging** de la tarea (`*.dev.odoo.com`), nunca en producción.
-- **Solo lectura.** El script **nunca** hace `commit()`; lo que escriba dentro de la transacción se deshace. Verificado en el código de Odoo 15.0 a 19.0 (`odoo/cli/shell.py`) y en un build de Odoo 18: al terminar el script el shell hace `cr.rollback()` y no queda nada guardado. `diag.js` añade además un `rollback()` explícito.
-- **Lo que el rollback no deshace**:
-  - métodos que hacen commit por su cuenta (crons, envío de correo con `auto_commit`, colas);
-  - **llamadas a servicios externos**: correo, HTTP, EDI, conectores fiscales (por ejemplo SII o las comprobaciones de la AEAT de `l10n-spain`), pasarelas de pago. **[no verificado]** que la neutralización del staging de Odoo.sh las bloquee en módulos OCA o propios.
-  
-  Por defecto, el diagnóstico solo **lee** (`search`, `read`, campos calculados, `_compute_*`). Llamar a un método de negocio (`action_confirm`, `action_post`, `write` con automatizaciones…) solo con el OK explícito del usuario y tras comprobar que no contacta con nada externo; si no se puede asegurar, reproducir el fallo en un test.
-- El guard decodifica el script (va en base64 dentro del comando) y deniega `commit(`, `auto_commit=True` y el SQL de escritura. Un `odoo-bin shell` con el script fuera del comando (`< archivo`, consola interactiva) pide confirmación: no se puede revisar.
-- **Datos del cliente**: el staging es una copia neutralizada de producción con datos reales. La salida se usa en la tarea y en el informe local; **nunca** va a la memoria del proyecto (`notes.js`) ni al repo. Imprimir solo lo necesario (ids, recuentos, estados), no nombres, correos ni importes de clientes salvo que hagan falta.
-- No escribir nunca en la consola *Odoo shell* que abre el editor: va con transacción abierta.
+- Only on the **staging** build of the task (`*.dev.odoo.com`), never on production.
+- **Read-only.** The script **never** calls `commit()`; whatever it writes inside the transaction is rolled back. Verified in the Odoo 15.0 to 19.0 code (`odoo/cli/shell.py`) and on an Odoo 18 build: when the script ends the shell runs `cr.rollback()` and nothing is saved. `diag.js` also adds an explicit `rollback()`.
+- **What the rollback does not undo**:
+  - methods that commit on their own (crons, mail sending with `auto_commit`, queues);
+  - **calls to external services**: mail, HTTP, EDI, tax connectors (e.g. SII or the AEAT checks in `l10n-spain`), payment gateways. **[unverified]** that the Odoo.sh staging neutralisation blocks them in OCA or custom modules.
 
-## 1. Preparar (local)
+  By default, diagnostics only **read** (`search`, `read`, computed fields, `_compute_*`). Call a business method (`action_confirm`, `action_post`, `write` with automations…) only with the user's explicit OK and after checking it contacts nothing external; if that cannot be ensured, reproduce the failure in a test.
+- The guard decodes the script (it travels in base64 inside the command) and denies `commit(`, `auto_commit=True` and write SQL. An `odoo-bin shell` with the script outside the command (`< file`, interactive console) asks for confirmation: it cannot be reviewed.
+- **Client data**: staging is a neutralised copy of production with real data. The output is used in the task and the local report; it **never** goes to the project memory (`notes.js`) or the repo. Print only what is needed (ids, counts, states), not client names, emails or amounts unless they are needed.
+- Never type in the *Odoo shell* console the editor opens: it runs with an open transaction.
 
-Escribir el script en un archivo local (por ejemplo `.oap/odoosh-browser/diag/caso.py`) usando `env`, como en el shell:
+## 1. Prepare (local)
+
+Write the script in a local file (e.g. `.oap/odoosh-browser/diag/case.py`) using `env`, as in the shell:
 ```python
 so = env['sale.order'].browse(1234)
-print('estado', so.state, 'lineas', len(so.order_line))
-print('importe calculado', so.amount_total, 'impuestos', so.order_line.tax_id.ids)
+print('state', so.state, 'lines', len(so.order_line))
+print('computed amount', so.amount_total, 'taxes', so.order_line.tax_id.ids)
 ```
-Después:
+Then:
 ```bash
-node <plugin>/scripts/diag.js prepare .oap/odoosh-browser/diag/caso.py
+node <plugin>/scripts/diag.js prepare .oap/odoosh-browser/diag/case.py
 ```
-Revisa el script, lo envuelve (los errores del script salen en la salida normal, con `rollback()` al final) e imprime los comandos de una sola línea. No se conecta al build. Máximo unos 6 KB de script: para algo mayor, dividirlo.
+It checks the script, wraps it (script errors come out in normal output, with `rollback()` at the end) and prints the one-line commands. It does not connect to the build. Maximum about 6 KB of script: split anything larger.
 
-## 2a. Ejecutar por SSH
+## 2a. Run over SSH
 
-Con la herramienta **Bash** (comillas simples, para que `$PGDATABASE` se expanda en el build y no en local), sustituyendo `<build>`:
+With the **Bash** tool (single quotes, so `$PGDATABASE` expands on the build and not locally), replacing `<build>`:
 ```bash
 ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new <build> 'echo <base64> | base64 -d | odoo-bin shell -d "$PGDATABASE" --no-http --log-level=error >/tmp/oap-diag.out 2>/tmp/oap-diag.err; echo EXIT=$?; head -c 20000 /tmp/oap-diag.out; tail -n 3 /tmp/oap-diag.err; rm /tmp/oap-diag.out /tmp/oap-diag.err'
 ```
 
-## 2b. Ejecutar por el terminal del editor
+## 2b. Run through the editor terminal
 
-1. Abrir un terminal (*File → New → Terminal*) y escribir el comando del editor que imprime `diag.js`, en una sola línea; la salida va a `~/oap-diag.txt` (cortada a 20 KB).
-2. Esperar a `EXIT=` en el terminal (unos 15-30 s: el shell carga el registro).
-3. Leer la salida **como texto**, sin capturas, en otra pestaña: `https://<build>/odoo-sh/editor/api/contents/oap-diag.txt?content=1&format=text&type=file` con `get_page_text` ([editor-jupyterlab.md](editor-jupyterlab.md) §3).
-4. Borrar: `rm ~/oap-diag.txt`.
+1. Open a terminal (*File → New → Terminal*) and type the editor command `diag.js` prints, on one line; the output goes to `~/oap-diag.txt` (cut at 20 KB).
+2. Wait for `EXIT=` in the terminal (about 15-30 s: the shell loads the registry).
+3. Read the output **as text**, without screenshots, in another tab: `https://<build>/odoo-sh/editor/api/contents/oap-diag.txt?content=1&format=text&type=file` with `get_page_text` ([editor-jupyterlab.md](editor-jupyterlab.md) §3).
+4. Delete: `rm ~/oap-diag.txt`.
 
-## 3. Interpretar
+## 3. Interpret
 
-- `EXIT=0` y la salida del script: el script se ejecutó; un error del script aparece como traceback **dentro** de la salida.
-- `EXIT` distinto de 0 y salida vacía: el shell no arrancó (base de datos, módulo que no carga); mirar las últimas líneas de error que imprime el comando.
-- Lo que el diagnóstico confirme se pasa a un test de regresión ([tests.md](tests.md), y en el squad al fixer). Si demuestra un hecho útil para otras tareas (un campo, un método, una rareza de la versión), anotarlo con `notes.js` **sin datos del cliente**.
+- `EXIT=0` and the script's output: the script ran; a script error shows as a traceback **inside** the output.
+- `EXIT` other than 0 and empty output: the shell did not start (database, a module that fails to load); check the last error lines the command prints.
+- What the diagnostics confirm goes into a regression test ([tests.md](tests.md), and in the squad to the fixer). If it shows a fact useful for other tasks (a field, a method, a version quirk), note it with `notes.js` **without client data**.

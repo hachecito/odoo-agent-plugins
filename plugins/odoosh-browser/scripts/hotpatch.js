@@ -7,11 +7,11 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const REMOTE_PATCH = '~/oap-hotpatch.patch';
-const USAGE = `Uso: hotpatch.js prepare --base <sha> [--only <ruta> ...] [--dir <repo>]
-  Genera .oap/odoosh-browser/hotpatch/ (patch.diff, patch.b64, manifest.json) con los cambios
-  locales respecto a <sha>, el commit que corre el build. --only limita el parche a esas rutas
-  (por ejemplo solo los tests, para ver el test de regresión en rojo antes del arreglo).
-  No se conecta al build: imprime los comandos para SSH y para el terminal del editor.`;
+const USAGE = `Usage: hotpatch.js prepare --base <sha> [--only <path> ...] [--dir <repo>]
+  Writes .oap/odoosh-browser/hotpatch/ (patch.diff, patch.b64, manifest.json) with the local
+  changes against <sha>, the commit the build runs. --only limits the patch to those paths
+  (for example only the tests, to see the regression test fail before the fix).
+  It never connects to the build: it prints the commands for SSH and for the editor terminal.`;
 
 /**
  * Run git in a repo.
@@ -31,7 +31,7 @@ function git(root, args, env = process.env) {
  */
 function prepare({ root, base, only = [] }) {
   const rb = git(root, ['rev-parse', '--verify', '--quiet', `${base}^{commit}`]);
-  if (rb.status !== 0) throw new Error(`No existe el commit ${base} en local: hacer git fetch o revisar el SHA del build.`);
+  if (rb.status !== 0) throw new Error(`Commit ${base} not found locally: run git fetch or check the build SHA.`);
   const sha = rb.stdout.trim();
   // The plugin's own .oap/ folder is never part of a whole-repo patch, even where it is not excluded.
   // (observed with git 2.47 on Windows: it stages nothing when an exclude is combined with a narrower path, so only here.)
@@ -55,12 +55,12 @@ function prepare({ root, base, only = [] }) {
   } finally {
     fs.rmSync(tmpIndex, { force: true });
   }
-  if (diff.status !== 0) throw new Error(diff.stderr.trim() || 'git diff falló');
+  if (diff.status !== 0) throw new Error(diff.stderr.trim() || 'git diff failed');
   const files = names.stdout.split('\n').filter(Boolean).map((line) => {
     const [status, file] = line.split('\t');
     return { path: file, status: status[0], hash: null, untracked: untracked.has(file) };
   });
-  if (!files.length) throw new Error(`No hay cambios respecto a ${sha.slice(0, 12)}.`);
+  if (!files.length) throw new Error(`No changes against ${sha.slice(0, 12)}.`);
   const present = files.filter((f) => f.status !== 'D');
   if (present.length) {
     // hash-object applies the same line-ending filters as git, so CRLF copies on Windows match the build.
@@ -83,26 +83,26 @@ function instructions(m) {
   const present = m.files.filter((f) => f.status !== 'D').map((f) => f.path).join(' ');
   // Forward slashes: the apply line runs in Git Bash (PowerShell 5.1 has no `<` input redirection).
   const patch = path.join(m.dir, 'patch.diff').replace(/\\/g, '/');
-  const row = (f) => `  ${f.status} ${f.path}${f.hash ? '  ' + f.hash.slice(0, 12) : '  (borrado)'}`;
+  const row = (f) => `  ${f.status} ${f.path}${f.hash ? '  ' + f.hash.slice(0, 12) : '  (deleted)'}`;
   const fresh = m.files.filter((f) => f.untracked);
   const lines = [
-    `Parche: ${m.files.length} archivo(s), ${m.bytes} bytes, base ${m.base.slice(0, 12)}.`,
+    `Patch: ${m.files.length} file(s), ${m.bytes} bytes, base ${m.base.slice(0, 12)}.`,
     ...m.files.filter((f) => !f.untracked).map(row),
-    ...(fresh.length ? ['Nuevos sin seguimiento en git (revisar: solo deben ir los de la tarea; si sobra alguno, repetir con --only <módulos>):', ...fresh.map(row)] : []),
+    ...(fresh.length ? ['New files not tracked by git (check: only the task files belong here; if any is extra, rerun with --only <modules>):', ...fresh.map(row)] : []),
     '',
-    'SSH (preferente; con la herramienta Bash, no PowerShell). Antes, el build debe correr la base y ~/src/user estar limpio:',
+    'SSH (only if enabled; with the Bash tool, not PowerShell). First, the build must run the base and ~/src/user must be clean:',
     '  ssh <build> "cd ~/src/user && git rev-parse HEAD && git status --porcelain"',
     `  ssh <build> "cat > ${REMOTE_PATCH} && cd ~/src/user && git apply --check ${REMOTE_PATCH} && git apply ${REMOTE_PATCH}" < "${patch}"`,
     present ? `  ssh <build> "cd ~/src/user && git hash-object ${present} | cut -c1-12"` : '',
     '',
-    `Editor (terminal web): escribir ${path.join(m.dir, 'patch.b64')} entre las dos líneas:`,
+    `Editor (web terminal): type ${path.join(m.dir, 'patch.b64')} between the two lines:`,
     `  base64 -d > ${REMOTE_PATCH} <<'OAP_EOF'`,
     '  ...',
     '  OAP_EOF',
     `  cd ~/src/user && git apply --check ${REMOTE_PATCH} && git apply ${REMOTE_PATCH}`,
     present ? `  git hash-object ${present} | cut -c1-12` : '',
     '',
-    `Revertir (antes del push y al cerrar): cd ~/src/user && git apply -R ${REMOTE_PATCH}`,
+    `Revert (before the push and when done): cd ~/src/user && git apply -R ${REMOTE_PATCH}`,
   ];
   return lines.filter((l, i) => l !== '' || lines[i - 1] !== '').join('\n');
 }
@@ -130,7 +130,7 @@ function main(args) {
   if (!base) { console.error(USAGE); process.exitCode = 1; return; }
   const start = opts(args, 'dir')[0] || process.cwd();
   const top = git(start, ['rev-parse', '--show-toplevel']);
-  if (top.status !== 0) { console.error('No es un repositorio git.'); process.exitCode = 1; return; }
+  if (top.status !== 0) { console.error('Not a git repository.'); process.exitCode = 1; return; }
   try {
     console.log(instructions(prepare({ root: top.stdout.trim(), base, only: opts(args, 'only') })));
   } catch (e) {

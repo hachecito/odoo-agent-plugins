@@ -60,7 +60,7 @@ function main() {
       if (result) emit(result);
     } catch (err) {
       // Fail closed to "ask" instead of silently allowing when the policy crashes.
-      emit({ decision: ASK, reason: `Error del guard (${err.message}); confirmar manualmente.` });
+      emit({ decision: ASK, reason: `Guard error (${err.message}); confirm manually.` });
     }
     process.exit(0);
   });

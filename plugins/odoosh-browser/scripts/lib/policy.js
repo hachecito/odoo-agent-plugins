@@ -70,11 +70,11 @@ const ODOO_PUBLIC_HOSTS = new Set(['odoo.com', 'www.odoo.com']);
 
 // Commands that must never run on an Odoo.sh build (terminal, SSH or browser terminal).
 const REMOTE_DENY = [
-  { re: /\bodoosh-push\b/i, why: 'odoosh-push sube commits desde el build al repositorio.' },
-  { re: /\bgit\s+push\b/i, why: 'git push desde el build no está permitido.' },
-  { re: /\brm\s+-[a-z]*r[a-z]*f|\brm\s+-[a-z]*f[a-z]*r/i, why: 'rm -rf no está permitido.' },
-  { re: /\bdropdb\b|\bDROP\s+(TABLE|DATABASE|SCHEMA)\b|\bTRUNCATE\b/i, why: 'operación destructiva de base de datos.' },
-  { re: /\bDELETE\s+FROM\b|\bUPDATE\s+\S+\s+SET\b|\bALTER\s+TABLE\b/i, why: 'escritura SQL directa no permitida.' },
+  { re: /\bodoosh-push\b/i, why: 'odoosh-push uploads commits from the build to the repository.' },
+  { re: /\bgit\s+push\b/i, why: 'git push from the build is not allowed.' },
+  { re: /\brm\s+-[a-z]*r[a-z]*f|\brm\s+-[a-z]*f[a-z]*r/i, why: 'rm -rf is not allowed.' },
+  { re: /\bdropdb\b|\bDROP\s+(TABLE|DATABASE|SCHEMA)\b|\bTRUNCATE\b/i, why: 'destructive database operation.' },
+  { re: /\bDELETE\s+FROM\b|\bUPDATE\s+\S+\s+SET\b|\bALTER\s+TABLE\b/i, why: 'direct SQL writes are not allowed.' },
 ];
 
 /**
@@ -196,12 +196,12 @@ function evaluatePushIdle(args, ctx) {
   const prod = ctx.config.production_branches;
   const { destructive, refspecs } = parsePush(args);
   if (['--mirror', '--all', '--branches'].includes(destructive)) {
-    return { decision: DENY, reason: `git push ${destructive} puede incluir la rama de producción.` };
+    return { decision: DENY, reason: `git push ${destructive} may include the production branch.` };
   }
   const targets = refspecs.length ? refspecs.map((s) => refspecTarget(s, ctx)) : [ctx.branchOf(ctx.dir)];
   const hit = targets.find((t) => t && prod.includes(t));
-  if (hit) return { decision: DENY, reason: `Push directo a la rama de producción "${hit}" bloqueado: en Odoo.sh despliega al cliente. Usar una rama y un PR.` };
-  if (targets.includes(null)) return { decision: ASK, reason: 'No se pudo determinar la rama destino del push: confirmar que no es producción.' };
+  if (hit) return { decision: DENY, reason: `Direct push to the production branch "${hit}" blocked: on Odoo.sh it deploys to the client. Use a branch and a PR.` };
+  if (targets.includes(null)) return { decision: ASK, reason: 'Could not determine the push target branch: confirm it is not production.' };
   return null;
 }
 
@@ -214,21 +214,21 @@ function evaluatePushIdle(args, ctx) {
 function evaluatePush(args, ctx) {
   const { config } = ctx;
   const { force, destructive, tags, refspecs } = parsePush(args);
-  if (force) return { decision: DENY, reason: 'Force push bloqueado por odoosh-browser.' };
-  if (destructive) return { decision: DENY, reason: `git push ${destructive} bloqueado (puede borrar o sobrescribir ramas remotas).` };
+  if (force) return { decision: DENY, reason: 'Force push blocked by odoosh-browser.' };
+  if (destructive) return { decision: DENY, reason: `git push ${destructive} blocked (it can delete or overwrite remote branches).` };
 
   if (!refspecs.length) {
     // Without a refspec the destination depends on push.default/upstream config: require it explicitly.
-    return { decision: DENY, reason: `Indicar remoto y rama explícitos: git push origin ${config.staging_branch || '<rama-staging>'}.` };
+    return { decision: DENY, reason: `Name the remote and branch explicitly: git push origin ${config.staging_branch || '<staging-branch>'}.` };
   }
   const targets = [];
   for (const spec of refspecs) {
-    if (spec.startsWith('+')) return { decision: DENY, reason: `Refspec forzado "${spec}" bloqueado.` };
-    if (spec.startsWith(':')) return { decision: DENY, reason: `Borrado de rama remota "${spec}" bloqueado.` };
+    if (spec.startsWith('+')) return { decision: DENY, reason: `Forced refspec "${spec}" blocked.` };
+    if (spec.startsWith(':')) return { decision: DENY, reason: `Remote branch deletion "${spec}" blocked.` };
     let dst = spec.includes(':') ? spec.split(':').pop() : spec;
     if (dst === 'HEAD' || dst === '@') {
       const current = ctx.branchOf(ctx.dir);
-      if (!current) return { decision: ASK, reason: 'No se pudo determinar la rama actual del push.' };
+      if (!current) return { decision: ASK, reason: 'Could not determine the current branch for the push.' };
       dst = current;
     }
     targets.push(shortRef(dst));
@@ -236,20 +236,20 @@ function evaluatePush(args, ctx) {
 
   for (const t of targets) {
     if (config.production_branches.includes(t)) {
-      return { decision: DENY, reason: `Push a la rama de producción "${t}" prohibido.` };
+      return { decision: DENY, reason: `Push to the production branch "${t}" is forbidden.` };
     }
   }
   if (!config.staging_branch) {
-    return { decision: DENY, reason: 'No hay staging_branch configurada en .oap/odoosh-browser/config.json: preguntar al usuario la rama staging antes de hacer push.' };
+    return { decision: DENY, reason: 'No staging_branch set in .oap/odoosh-browser/config.json: ask the user for the staging branch before pushing.' };
   }
   const others = targets.filter((t) => t !== config.staging_branch);
   if (others.length) {
     // Feature branches (e.g. for a PR against production) are allowed after confirmation.
-    return { decision: ASK, reason: `Push a una rama que no es la staging "${config.staging_branch}" (destino: ${others.join(', ')}): confirmar.` };
+    return { decision: ASK, reason: `Push to a branch other than the staging "${config.staging_branch}" (target: ${others.join(', ')}): confirm.` };
   }
   // Opt-in per project: a plain push to the staging branch is not questioned. Tags still ask; production is denied above.
   if (!tags && config.autonomy && config.autonomy.push_staging === 'auto' && !config.autonomy.yolo) return null;
-  return yoloAsk(config, `Confirmar push a la rama staging "${config.staging_branch}"${tags ? ' (incluye tags)' : ''}.`);
+  return yoloAsk(config, `Confirm push to the staging branch "${config.staging_branch}"${tags ? ' (includes tags)' : ''}.`);
 }
 
 /**
@@ -277,46 +277,46 @@ function evaluateGit(tokens, ctx) {
   if (!sub) return null;
   // Outside an active plugin task the user works freely; only direct pushes to production are blocked.
   if (!ctx.runActive(loaded.root)) return sub === 'push' ? evaluatePushIdle(args, local) : null;
-  if (pushConfig) return { decision: ASK, reason: 'git -c push.*/remote.* altera el destino de los push: confirmar.' };
+  if (pushConfig) return { decision: ASK, reason: 'git -c push.*/remote.* changes where pushes go: confirm.' };
 
   // Squad rule: subagents hand their changes back; only the main thread commits and pushes.
   if (ctx.subagent && (sub === 'push' || sub === 'commit')) {
-    return { decision: DENY, reason: `git ${sub} desde un subagente bloqueado: solo el hilo principal (orquestador) hace commit y push.` };
+    return { decision: DENY, reason: `git ${sub} from a subagent blocked: only the main thread (orchestrator) commits and pushes.` };
   }
   switch (sub) {
     case 'push':
       return evaluatePush(args, local);
     case 'config':
       if (args.some((a) => /^(push|remote|branch)\./i.test(a))) {
-        return { decision: ASK, reason: 'Cambiar configuración push/remote/branch: confirmar.' };
+        return { decision: ASK, reason: 'Changing push/remote/branch configuration: confirm.' };
       }
       return null;
     case 'branch':
       if (args.some((a) => a === '--delete' || hasShortFlag(a, 'd') || hasShortFlag(a, 'D'))) {
-        return { decision: DENY, reason: 'Borrar ramas está prohibido.' };
+        return { decision: DENY, reason: 'Deleting branches is forbidden.' };
       }
       if (args.some((a) => hasShortFlag(a, 'm') || hasShortFlag(a, 'M') || a === '--move' || hasShortFlag(a, 'f') || a === '--force')) {
-        return { decision: ASK, reason: 'Renombrar o sobrescribir ramas requiere confirmación.' };
+        return { decision: ASK, reason: 'Renaming or overwriting branches needs confirmation.' };
       }
       return null;
     case 'reset':
-      if (args.includes('--hard')) return { decision: DENY, reason: 'git reset --hard puede borrar cambios del usuario.' };
+      if (args.includes('--hard')) return { decision: DENY, reason: 'git reset --hard can erase the user\'s changes.' };
       return null;
     case 'clean':
-      if (args.some((a) => hasShortFlag(a, 'f') || a === '--force')) return { decision: DENY, reason: 'git clean -f borra archivos no versionados.' };
+      if (args.some((a) => hasShortFlag(a, 'f') || a === '--force')) return { decision: DENY, reason: 'git clean -f deletes untracked files.' };
       return null;
     case 'filter-branch':
     case 'filter-repo':
     case 'update-ref':
-      return { decision: DENY, reason: `git ${sub} reescribe historia o referencias.` };
+      return { decision: DENY, reason: `git ${sub} rewrites history or references.` };
     case 'checkout':
     case 'restore':
       if (sub === 'restore' || args.includes('--') || args.includes('.') || args.some((a) => hasShortFlag(a, 'f') || a === '--force')) {
-        return { decision: ASK, reason: `git ${sub} puede descartar cambios locales del usuario.` };
+        return { decision: ASK, reason: `git ${sub} can discard the user's local changes.` };
       }
       return null;
     case 'stash':
-      if (['drop', 'clear'].includes(args[0])) return { decision: ASK, reason: `git stash ${args[0]} elimina cambios guardados.` };
+      if (['drop', 'clear'].includes(args[0])) return { decision: ASK, reason: `git stash ${args[0]} removes stashed changes.` };
       return null;
     case 'commit':
     case 'merge':
@@ -326,18 +326,18 @@ function evaluateGit(tokens, ctx) {
     case 'am':
     case 'pull': {
       const branch = ctx.branchOf(dir);
-      if (!branch) return { decision: ASK, reason: `No se pudo determinar la rama actual antes de git ${sub}: confirmar.` };
+      if (!branch) return { decision: ASK, reason: `Could not determine the current branch before git ${sub}: confirm.` };
       if (config.production_branches.includes(branch)) {
-        return { decision: DENY, reason: `Rama actual "${branch}" es de producción: no se permiten ${sub} en ella.` };
+        return { decision: DENY, reason: `Current branch "${branch}" is a production branch: ${sub} is not allowed on it.` };
       }
       if (sub === 'merge' && args.some((a) => config.production_branches.includes(shortRef(a.replace(/^origin\//, ''))))) {
-        return { decision: ASK, reason: 'Merge desde una rama de producción: confirmar.' };
+        return { decision: ASK, reason: 'Merge from a production branch: confirm.' };
       }
       return null;
     }
     case 'remote':
       if (['add', 'set-url', 'rename', 'remove', 'rm'].includes(args[0])) {
-        return { decision: ASK, reason: `git remote ${args[0]} cambia los destinos de push.` };
+        return { decision: ASK, reason: `git remote ${args[0]} changes the push targets.` };
       }
       return null;
     default:
@@ -352,7 +352,7 @@ function evaluateGit(tokens, ctx) {
  */
 function evaluateRemoteText(text) {
   const hit = REMOTE_DENY.find((r) => r.re.test(text));
-  if (hit) return { decision: DENY, reason: `Comando remoto bloqueado: ${hit.why}` };
+  if (hit) return { decision: DENY, reason: `Remote command blocked: ${hit.why}` };
   return evaluateOdooShell(text);
 }
 
@@ -365,15 +365,15 @@ function evaluateOdooShell(text) {
   if (!/\bodoo-bin\s+shell\b/i.test(text)) return null;
   const payloads = text.match(/[A-Za-z0-9+/]{40,}={0,2}/g) || [];
   if (!payloads.length) {
-    return { decision: ASK, reason: 'odoo-bin shell sin el script en base64 dentro del comando: no se puede revisar; confirmar.' };
+    return { decision: ASK, reason: 'odoo-bin shell without the base64 script inside the command: it cannot be checked; confirm.' };
   }
   for (const p of payloads) {
     const code = Buffer.from(p, 'base64').toString('utf8');
     if (/\bcommit\s*\(|auto_commit\s*=\s*True/.test(code)) {
-      return { decision: DENY, reason: 'El script de odoo-bin shell hace commit: el diagnóstico es solo lectura (sin commit, el shell deshace todo al terminar).' };
+      return { decision: DENY, reason: 'The odoo-bin shell script commits: diagnostics are read-only (without a commit the shell rolls everything back at the end).' };
     }
     const hit = REMOTE_DENY.find((r) => r.re.test(code));
-    if (hit) return { decision: DENY, reason: `Script de odoo-bin shell bloqueado: ${hit.why}` };
+    if (hit) return { decision: DENY, reason: `odoo-bin shell script blocked: ${hit.why}` };
   }
   return null;
 }
@@ -404,7 +404,7 @@ function evaluateSsh(args, ctx) {
   if (!loaded || !ctx.runActive(loaded.root)) return null;
   const config = loaded.config;
   if (isProductionHost(host, config)) {
-    return { decision: DENY, reason: `SSH a "${host}" bloqueado: se trata como producción (solo se permiten builds *.dev.odoo.com).` };
+    return { decision: DENY, reason: `SSH to "${host}" blocked: it is treated as production (only *.dev.odoo.com builds are allowed).` };
   }
   const remote = args.slice(i + 1).join(' ');
   return remote ? evaluateRemoteText(remote) : null;
@@ -418,14 +418,14 @@ function evaluateSsh(args, ctx) {
  */
 function evaluateConfigWrite(tokens) {
   const isConfigCli = tokens.some((t) => /(^|[\\/])config\.js$/.test(t)) && tokens.some((t) => ['init', 'set-staging', 'set-ssh', 'set-autonomy', 'migrate'].includes(t));
-  if (isConfigCli) return { decision: ASK, reason: 'Cambio de la configuración del plugin (rama staging/producción/SSH, autonomía o migración de archivos): confirmar con el usuario.' };
+  if (isConfigCli) return { decision: ASK, reason: 'Change to the plugin configuration (staging/production branch, SSH, autonomy or file migration): confirm with the user.' };
   // Only real writes count: a redirection to the file or a writing program naming it (reading it with cat is free).
   const redirected = (tokens.redirects || []).some((t) => PROTECTED_PATH.test(t));
   const prog = programName(tokens[0]);
   const writer = WRITER_PROGRAMS.has(prog) || (prog === 'sed' && tokens.some((t) => /^(-i|--in-place)/.test(t) || /^-[a-zA-Z]*i/.test(t)));
   const written = writer && tokens.slice(1).some((t) => PROTECTED_PATH.test(t));
   if (redirected || written) {
-    return { decision: ASK, reason: 'Modificación de la configuración o las notas del plugin desde la shell: confirmar.' };
+    return { decision: ASK, reason: 'Changing the plugin configuration or notes from the shell: confirm.' };
   }
   return null;
 }
@@ -444,7 +444,7 @@ function evaluateSubagentStateWrite(tokens) {
     if (!m || (!m[3] && !/(^|[\\/])oap\.js$/.test(tokens[i - 1] || ''))) continue;
     const writes = m[2] === 'run-state' ? RUN_WRITE_CMDS : NOTES_WRITE_CMDS;
     if (writes.has(tokens[i + 1])) {
-      return { decision: DENY, reason: `${m[2]}.js ${tokens[i + 1]} desde un subagente bloqueado: devolver la evidencia o la lección al orquestador, que es quien la registra.` };
+      return { decision: DENY, reason: `${m[2]}.js ${tokens[i + 1]} from a subagent blocked: hand the evidence or lesson back to the orchestrator, which records it.` };
     }
   }
   return null;
@@ -512,7 +512,7 @@ function evaluateCommand(command, ctx, depth = 0) {
   const merged = strictest(results);
   // A push-like text that the parser did not recognize as a git push is suspicious.
   if (!merged && depth === 0 && !ctx.seen.push && ctx.loadConfig(dir) && /\bgit(\.exe)?["']?(\s+-\S+(\s+\S+)?)*\s+push\b/i.test(command)) {
-    return { decision: ASK, reason: 'Posible git push que no se pudo analizar: confirmar.' };
+    return { decision: ASK, reason: 'Possible git push that could not be parsed: confirm.' };
   }
   return merged;
 }
@@ -553,15 +553,15 @@ function evaluateChrome(toolName, toolInput, ctx) {
     for (const m of s.matchAll(/https?:\/\/([^/\s:"'?#]+)/gi)) {
       const host = m[1].toLowerCase();
       if (isProductionHost(host, ctx.config)) {
-        results.push({ decision: DENY, reason: `Navegación a ${host} bloqueada: se trata como instancia de producción.` });
+        results.push({ decision: DENY, reason: `Navigation to ${host} blocked: it is treated as a production instance.` });
       } else if (!hostAllowed(host, ctx.config.allowed_domains)) {
-        results.push({ decision: ASK, reason: `Navegación a dominio no permitido: ${host}.` });
+        results.push({ decision: ASK, reason: `Navigation to a domain not allowed: ${host}.` });
       }
     }
     results.push(evaluateRemoteText(s));
   }
   if (/javascript|evaluate|execute_script/i.test(toolName)) {
-    results.push(yoloAsk(ctx.config, 'Ejecución de JavaScript en el navegador: confirmar.'));
+    results.push(yoloAsk(ctx.config, 'Running JavaScript in the browser: confirm.'));
   }
   return strictest(results);
 }
@@ -581,11 +581,11 @@ function evaluate(event, deps) {
   if (!yolo) return result;
   // Yolo mode (opt-in, active task only): approve asks marked as yolo-safe; config changes, unknown domains,
   // other branches and anything unparsed keep asking, and deny always wins.
-  if (result) return result.yolo ? { decision: ALLOW, reason: `Modo yolo: ${result.reason}` } : result;
+  if (result) return result.yolo ? { decision: ALLOW, reason: `Yolo mode: ${result.reason}` } : result;
   const name = event.tool_name || '';
-  if (CHROME_TOOL.test(name)) return { decision: ALLOW, reason: 'Modo yolo: Claude in Chrome en un dominio permitido.' };
+  if (CHROME_TOOL.test(name)) return { decision: ALLOW, reason: 'Yolo mode: Claude in Chrome on an allowed domain.' };
   if (SHELL_TOOLS.has(name) && isYoloSafeCommand(String((event.tool_input || {}).command || ''), cwd)) {
-    return { decision: ALLOW, reason: 'Modo yolo: script del plugin o ssh a un build de desarrollo/staging.' };
+    return { decision: ALLOW, reason: 'Yolo mode: plugin script or ssh to a development/staging build.' };
   }
   return null;
 }
@@ -604,7 +604,7 @@ function evaluateRules(event, deps) {
   if (FILE_TOOLS.has(name)) {
     const target = String(input.file_path || input.notebook_path || '');
     return CONFIG_FILE.test(target)
-      ? { decision: ASK, reason: `Edición directa de ${path.basename(target)}: confirmar con el usuario (usar config.js / notes.js).` }
+      ? { decision: ASK, reason: `Direct edit of ${path.basename(target)}: confirm with the user (use config.js / notes.js).` }
       : null;
   }
   // Shell commands resolve the config per directory (git -C, cd), so they are not gated on cwd.
@@ -619,22 +619,22 @@ function evaluateRules(event, deps) {
   if (!deps.runActive(loaded.root)) {
     // Outside a plugin task: merging a PR may deploy to production, everything else is free.
     return name === 'mcp__github__merge_pull_request'
-      ? { decision: ASK, reason: 'Fusionar un PR puede desplegar en producción si su base es la rama de producción: confirmar.' }
+      ? { decision: ASK, reason: 'Merging a PR can deploy to production if its base is the production branch: confirm.' }
       : null;
   }
   if (name.startsWith('mcp__github__')) {
     const tool = name.slice('mcp__github__'.length);
     if (GITHUB_WRITE_TOOLS.has(tool)) {
-      return { decision: DENY, reason: `mcp__github__${tool} bloqueado: los cambios de código se hacen con git local y push a staging.` };
+      return { decision: DENY, reason: `mcp__github__${tool} blocked: code changes go through local git and a push to staging.` };
     }
     return null;
   }
   if (REMOTE_EXEC_TOOLS.test(name)) {
-    return { decision: DENY, reason: 'Ejecución remota vía Composio bloqueada durante tareas Odoo.' };
+    return { decision: DENY, reason: 'Remote execution through Composio blocked during Odoo tasks.' };
   }
   if (CHROME_TOOL.test(name)) return evaluateChrome(name, input, ctx);
   if (OTHER_BROWSER_TOOL.test(name)) {
-    return { decision: DENY, reason: 'Durante una tarea del plugin el navegador es solo Claude in Chrome. Si no está disponible, pedir al usuario que ejecute /chrome o arranque con claude --chrome; no usar otro MCP de navegador.' };
+    return { decision: DENY, reason: 'During a plugin task the only browser is Claude in Chrome. If it is not available, ask the user to run /chrome or start with claude --chrome; do not use another browser MCP.' };
   }
   return null;
 }

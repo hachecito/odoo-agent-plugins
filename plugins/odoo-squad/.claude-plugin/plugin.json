@@ -1,7 +1,7 @@
 {
   "name": "odoo-squad",
-  "version": "0.6.0",
-  "description": "Squad de agentes autónomos para Odoo: planifica, implementa, prueba, corrige y consulta a un advisor, de principio a fin, sobre las salvaguardas y la memoria de odoosh-browser.",
+  "version": "0.7.0",
+  "description": "Squad of autonomous Odoo agents: plans, implements, tests, fixes and consults an advisor, end to end, on top of the odoosh-browser safeguards and memory.",
   "author": { "name": "hachecito" },
   "license": "MIT",
   "keywords": ["odoo", "odoo.sh", "agents", "squad", "automation"],

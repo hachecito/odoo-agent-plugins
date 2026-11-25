@@ -1,91 +1,91 @@
 # odoo-squad
 
-Squad de agentes autónomos para Odoo. Le das una tarea documentada y la lleva a cabo de principio a fin: planifica, implementa, prueba, corrige y verifica en staging de Odoo.sh, y aprende del proyecto. Usa las salvaguardas, el estado y la memoria de `odoosh-browser`, que es **requisito**.
+Squad of autonomous Odoo agents. Give it a documented task and it carries it out end to end: plans, implements, tests, fixes and verifies on Odoo.sh staging, and learns from the project. It uses the safeguards, state and memory of `odoosh-browser`, which is **required**.
 
-## Uso
+## Usage
 
 ```powershell
 claude plugin install odoosh-browser@odoo-agent-plugins
 claude plugin install odoo-squad@odoo-agent-plugins
 ```
 
-En un repo de módulos con `/odoosh-browser:odoo-project-setup` ya hecho:
+In a modules repo where `/odoosh-browser:odoo-project-setup` has already been run:
 
 ```
-/odoo-squad:squad-run tarea.md        # o una descripción en texto
+/odoo-squad:squad-run task.md        # or a text description
 ```
 
-## Agentes
+## Agents
 
-| Agente | Modelo | Función |
+| Agent | Model | Role |
 |---|---|---|
-| `squad-planner` | sonnet | dudas de la tarea antes del plan; plan con criterios de aceptación; rectifica si falla el enfoque |
-| `squad-implementer` | sonnet | código y tests según el plan |
-| `squad-tester` | sonnet | pruebas locales, parche de prueba en el build y tests en Odoo.sh; devuelve evidencias |
-| `squad-fixer` | sonnet | causa raíz, test de regresión que reproduce el fallo y corrección mínima |
-| `squad-advisor` | opus | solo consultas: resuelve las dudas de la tarea, decisiones complejas, bloqueos, acciones irreversibles |
-| `squad-writer` | haiku | resumen, descripción del PR y borradores de mensajes al cliente (nunca envía nada) |
+| `squad-planner` | sonnet | task questions before the plan; plan with acceptance criteria; revises it if the approach fails |
+| `squad-implementer` | sonnet | code and tests following the plan |
+| `squad-tester` | sonnet | local checks, test patch on the build and tests on Odoo.sh; returns evidence |
+| `squad-fixer` | sonnet | root cause, regression test that reproduces the failure and minimal fix |
+| `squad-advisor` | opus | consultation only: settles task questions, complex decisions, blockers, irreversible actions |
+| `squad-writer` | haiku | summary, PR description and client message drafts (never sends anything) |
 
-Los modelos son alias (`sonnet`, `opus`, `haiku`) que apuntan a la última versión; se cambian en el frontmatter de cada agente.
+The models are aliases (`sonnet`, `opus`, `haiku`) pointing to the latest version; change them in each agent's frontmatter.
 
-El orquestador es la skill `squad-run` (hilo principal), porque un subagente no puede lanzar otros. Solo el orquestador escribe en `.oap/`, hace commit y push.
+The orchestrator is the `squad-run` skill (main thread), because a subagent cannot launch others. Only the orchestrator writes to `.oap/`, commits and pushes.
 
-## Flujo
+## Flow
 
 ```
-tarea → planner(dudas) → advisor → usuario (solo lo que el advisor no decide) → planner(plan) → implementer → tester(local) → commit/push staging → tester(remote)
-                                   │ fallo                                  │ fallo
+task → planner(questions) → advisor → user (only what the advisor cannot decide) → planner(plan) → implementer → tester(local) → commit/push staging → tester(remote)
+                                   │ failure                                │ failure
                                    └──────────► fixer ◄─────────────────────┘
-                                   (máx. 3 ciclos; advisor si hay bloqueo) → verifier → writer → informe
+                                   (max. 3 cycles; advisor if blocked) → verifier → writer → report
 ```
 
-## Aclaración antes del plan
+## Clarification before the plan
 
-Antes de planificar, el planner lista las dudas que cambiarían el resultado (máx. 4). El advisor decide las que se pueden responder con el código del repo o la memoria, citando la prueba; lo que depende del estándar de Odoo se comprueba en su código (GitHub, rama de la versión) antes de aceptarlo. Al usuario solo le llegan las que dependen del negocio o del cliente, todas juntas en un mensaje y con una opción recomendada. Todo queda en `aclaraciones.md`.
+Before planning, the planner lists the questions that would change the result (max. 4). The advisor decides those the repo code or the memory can answer, citing the proof; what depends on standard Odoo is checked in its code (GitHub, version branch) before it is accepted. Only questions that depend on the business or the client reach the user, all together in one message and with a recommended option. Everything goes to `aclaraciones.md`.
 
-## Errores: test de regresión primero
+## Failures: regression test first
 
-Cuando una fase falla, el fixer escribe primero un test que reproduce el fallo y después el arreglo, y el tester lo lanza aislado en Odoo.sh (`--test-tags /<modulo>:<Clase>.<metodo>`) para confirmar que se ejecutó. Sin entorno local, el fixer explica qué aserción falla sin el arreglo; los fallos que no son de lógica (build, dependencias, datos de staging) no llevan test.
+When a phase fails, the fixer first writes a test that reproduces the failure and then the fix, and the tester runs it isolated on Odoo.sh (`--test-tags /<module>:<Class>.<method>`) to confirm it ran. Without a local environment, the fixer explains which assertion fails without the fix; failures that are not logic errors (build, dependencies, staging data) get no test.
 
-## Prueba rápida en el build (sin push)
+## Quick test on the build (no push)
 
-En el bucle de corrección, si hay un build staging en marcha, el tester aplica en él un parche con solo el test de regresión (debe fallar) y después con el arreglo (debe pasar), por SSH o desde el editor web, y lo deshace. Así se comprueba el arreglo sin esperar un build; después se hace commit y push como siempre. Detalle en `odoosh-browser` (`odoo-sh-remote` §5).
+In the fix loop, if a staging build is running, the tester applies a patch to it with only the regression test (must fail) and then with the fix (must pass), over SSH or from the web editor, and undoes it. That checks the fix without waiting for a build; then commit and push as usual. Details in `odoosh-browser` (`odoo-sh-remote` §5).
 
-## Autonomía
+## Autonomy
 
-Por defecto el push a staging y el JavaScript en Chrome piden confirmación, también cuando los lanza un subagente; si nadie responde, la tarea se queda parada. Por proyecto se puede subir el nivel con `oap.js config.js set-autonomy auto|yolo` (pide confirmación):
+By default the push to staging and JavaScript in Chrome ask for confirmation, also when a subagent launches them; if nobody answers, the task stalls. Per project the level can be raised with `oap.js config.js set-autonomy auto|yolo` (asks for confirmation):
 
-- `auto`: el push simple a staging deja de preguntar.
-- `yolo`: además, Chrome (incluido JavaScript en dominios permitidos), los scripts del plugin y `ssh` de lectura a builds de staging.
+- `auto`: a plain push to staging no longer asks.
+- `yolo`: also Chrome (including JavaScript on allowed domains), the plugin scripts and read-only `ssh` to staging builds.
 
-Producción, force push y demás denegaciones siguen igual en cualquier nivel. Detalle en la documentación de `odoosh-browser`.
+Production, force push and the other denials stay the same at any level. Details in the `odoosh-browser` documentation.
 
-Los subagentes no pueden hacer commit ni push: el guard lo deniega y solo el orquestador los hace.
+Subagents cannot commit or push: the guard denies it and only the orchestrator does it.
 
-## Memoria y tareas
+## Memory and tasks
 
 ```
 .oap/
-  memory.md                         lecciones reutilizables (compartida con odoosh-browser)
+  memory.md                         reusable lessons (shared with odoosh-browser)
   odoo-squad/tasks/
-    index.md                        una línea por tarea: id · estado · título
-    20261112-campo-referencia/
-      task.md                       la tarea tal como se entregó
-      aclaraciones.md               dudas resueltas antes del plan y quién las decidió
-      plan.md                       plan del planner (y sus rectificaciones)
-      hallazgos.md                  detalles que solo valen para esta tarea
+    index.md                        one line per task: id · status · title
+    20261112-customer-reference/
+      task.md                       the task as delivered
+      aclaraciones.md               questions settled before the plan and who decided them
+      plan.md                       the planner's plan (and its revisions)
+      hallazgos.md                  details that only apply to this task
 ```
 
-- El planner lee siempre `memory.md` y el índice, y solo abre la carpeta de una tarea anterior si está relacionada.
-- La memoria guarda solo lo que sirve en otras tareas, etiquetado por tema.
-- `scripts/tasks.js` crea las carpetas, mantiene el índice y migra el formato 0.1.0 (`tasks migrate`).
-- El hook de memoria de `odoosh-browser` (recordatorio de anotar hallazgos) actúa también durante `squad-run`.
+- The planner always reads `memory.md` and the index, and only opens a previous task's folder if it is related.
+- The memory only keeps what helps in other tasks, tagged by topic.
+- `scripts/tasks.js` creates the folders, maintains the index and migrates the 0.1.0 format (`tasks migrate`). Task statuses are `in-progress`, `completed`, `blocked`, `abandoned` and `migrated`; the Spanish ones from earlier versions are still accepted.
+- The `odoosh-browser` memory hook (reminder to note findings) also works during `squad-run`.
 
-## Pendiente (próximas versiones)
+## Planned (next versions)
 
-- Entorno local: Postgres global (Docker, config en `~/.oap/`, bases desechables con prefijo `oap_`) y código fuente de Odoo para ejecutar tests antes del push.
-- Comprobar en una sesión real que el `allow` del modo `yolo` evita las preguntas de los subagentes en segundo plano.
+- Local environment: global Postgres (Docker, config in `~/.oap/`, disposable databases prefixed `oap_`) and Odoo source code to run tests before the push.
+- Check in a real session that the `yolo` mode `allow` avoids the questions from background subagents.
 
-## Desarrollo
+## Development
 
-`npm test` (en esta carpeta) y `claude plugin validate .\plugins\odoo-squad`.
+`npm test` (in this folder) and `claude plugin validate .\plugins\odoo-squad`.
