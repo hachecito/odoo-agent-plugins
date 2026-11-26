@@ -28,7 +28,8 @@ const SECRET_PATTERNS = [
 ];
 // Global knowledge is shared by every project: no personal data, hosts or links outside public documentation.
 const GLOBAL_PATTERNS = [
-  [/\b[\w.+-]+@[\w-]+(\.[\w-]+)+\b/, 'an e-mail address'],
+  // The domain must end in a letter TLD, so code references like odoo/odoo@18.0:addons/... are not e-mails.
+  [/\b[\w.+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b/, 'an e-mail address'],
   // Lookarounds keep Odoo module versions (18.0.1.0.0) from looking like an IP.
   [/(?<![\d.])(\d{1,3}\.){3}\d{1,3}(?![\d.])/, 'an IP address'],
   [/\+\d{1,3}[\s-]?\d{2,4}([\s-]?\d{2,4}){2,}/, 'a phone number'],

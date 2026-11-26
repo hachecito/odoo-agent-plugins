@@ -28,6 +28,7 @@ Policy during a task:
 - **GitHub MCP**: write tools (`merge_pull_request`, `push_files`, `create_or_update_file`, `delete_file`, `create_branch`, ...) → denied.
 - **Composio** (remote execution) → denied.
 - **Editing `.oap/odoosh-browser/config.json` or `memory.md`** (Write/Edit, `config.js init|set-staging|set-ssh|set-autonomy|migrate`, `>` redirections or programs that write such as `cp`, `sed`, `Set-Content`) → confirmation, so the agent cannot change the staging or production branches on its own. Reading them (`cat`, `2>/dev/null`) is free.
+- **Direct editing of the knowledge stores** (`.oap/memory/`, `~/.oap/knowledge/`) → confirmation; entries are written with `knowledge.js`, which applies the same text rules plus stricter ones before copying an entry to global knowledge (no own module names, Odoo.sh project, staging branch, build hosts, e-mails, IPs or private links).
 - **Direct editing of `.oap/memory.md`** → confirmation. Notes are added with `notes.js`, which rejects text aimed at the plugin's own safeguards (its branch config, autonomy, the guard, skipping confirmations, pushing or merging to production branches) or that looks like a secret, so an instruction injected from a page or log cannot become persistent "knowledge".
 - `git -c push.*` and `git config push.*|remote.*|branch.*` → confirmation.
 - **Claude in Chrome** (best effort): `*.odoo.com` hosts other than `*.dev.odoo.com` and `www.odoo.com` → denied (treated as production instances; an assumption not verified in the Odoo.sh documentation, extendable with `ssh.production_hosts`); URLs outside `allowed_domains` → confirmation; text with forbidden commands → denied; JavaScript execution → confirmation.
@@ -62,10 +63,11 @@ Optional and per project, off by default (`confirm`). Changing it with `config.j
 - **`yolo`**: the guard answers `allow` (no question) to:
   - the confirmations it marks as safe: push to staging, including with tags, and JavaScript in Chrome on allowed domains;
   - Claude in Chrome tools with no other rule;
-  - a closed list of its own scripts (`run-state`, `notes`, `report`, `ssh-check`, `config`, `oap`, `tasks`, `hotpatch`, `diag`), only if they are in the real `odoosh-browser` or `odoo-squad` folder (the guard's own, its sibling or the marketplace install) and without redirections to files. A folder with the same name inside the repo does not count;
+  - a closed list of its own scripts (`run-state`, `notes`, `knowledge`, `report`, `ssh-check`, `config`, `oap`, `tasks`, `hotpatch`, `diag`), only if they are in the real `odoosh-browser` or `odoo-squad` folder (the guard's own, its sibling or the marketplace install) and without redirections to files. A folder with the same name inside the repo does not count;
   - `ssh` to `*.dev.odoo.com`, combined locally only with filters (`grep`, `tail`, `head`, `wc`, `sort`…). The **remote** command can be anything not on the denied list (`odoosh-push`, `git push`, `rm -rf`, write SQL): e.g. `odoo-bin --test-enable`, which writes to the staging database.
 - **At any level these still ask**:
-  - the plugin config and `memory.md`;
+  - the plugin config, `memory.md` and direct edits of the knowledge stores (`.oap/memory/`, `~/.oap/knowledge/`);
+  - `knowledge.js remove` and `knowledge.js migrate` (except `--dry-run`);
   - pushes to branches other than staging;
   - non-allowed domains;
   - `git remote` and `git -c|config push.*`;
@@ -80,4 +82,4 @@ Risk accepted with `yolo`: JavaScript in Chrome runs with the user's session on 
 
 ## Subagents
 
-During a task, `git commit` and `git push` launched from a subagent are denied: changes go back to the main thread, which reviews them and commits and pushes. Writes to the state and memory are also denied to it (`run-state.js` `init|state|evidence|cycle|close` and `notes.js` `add|remove|migrate`, directly or through `oap.js`): a subagent could overwrite more complete evidence from the main thread. `show` and `build-wait` stay allowed. It is identified by the hook input's `agent_id` field, which according to the Claude Code documentation is only present in subagents. Checked with `claude -p`: a main-thread call arrives without `agent_id` and a subagent's with it.
+During a task, `git commit` and `git push` launched from a subagent are denied: changes go back to the main thread, which reviews them and commits and pushes. Writes to the state and memory are also denied to it (`run-state.js` `init|state|evidence|cycle|close`, `notes.js` `add|remove|migrate` and `knowledge.js` `add|update|deprecate|remove|reindex|migrate`, directly or through `oap.js`): a subagent could overwrite more complete evidence from the main thread. `show`, `build-wait` and the knowledge reads (`search`, `get`, `context`, `validate`, `stats`) stay allowed. It is identified by the hook input's `agent_id` field, which according to the Claude Code documentation is only present in subagents. Checked with `claude -p`: a main-thread call arrives without `agent_id` and a subagent's with it.

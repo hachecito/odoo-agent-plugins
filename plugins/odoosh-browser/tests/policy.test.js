@@ -336,3 +336,32 @@ test('odoo-bin shell: diag.js commands pass the guard, nested browser_batch text
   assert.strictEqual(batch('odoosh-push'), 'deny');
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+test('knowledge stores: direct edits ask, reads are free, remove and migrate ask even in yolo', () => {
+  const sh = (command, opts) => decideYolo('Bash', { command }, opts);
+  for (const f of ['C:\\repo\\.oap\\memory\\entries\\tests\\p-20261126-7f3a.md', '/home/u/.oap/knowledge/entries/odoo/g-20261126-aa10.md', 'C:/repo/.oap/memory/_index/catalog.jsonl']) {
+    assert.strictEqual(decide('Write', { file_path: f }), 'ask', f);
+    assert.strictEqual(decide('Edit', { file_path: f }), 'ask', f);
+  }
+  assert.strictEqual(decide('Write', { file_path: 'C:\\repo\\.oap\\memoryx.md' }), null);
+  assert.strictEqual(bash('cat .oap/memory/entries/tests/p-20261126-7f3a.md'), null);
+  assert.strictEqual(bash('rm -rf .oap/memory/entries'), 'ask');
+  assert.strictEqual(bash('echo x > ~/.oap/knowledge/entries/odoo/g-20261126-aa10.md'), 'ask');
+  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/knowledge.js" search "picking lotes"`), 'allow');
+  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/knowledge.js" add --title x --summary y --category tests`), 'allow');
+  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/knowledge.js" remove g-20261126-aa10`), 'ask');
+  assert.strictEqual(sh(`node "${SQUAD_SCRIPTS}/oap.js" knowledge remove p-20261126-7f3a`), 'ask');
+  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/knowledge.js" migrate --apply`), 'ask');
+  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/knowledge.js" migrate --dry-run`), 'allow');
+});
+
+test('subagents can search knowledge but not write it during a task', () => {
+  const sub = (command, opts = {}) => decideYolo('Bash', { command }, { agentId: 'a1', ...opts });
+  for (const cmd of ['add --title x', 'update p-20261126-7f3a --status verified', 'deprecate p-20261126-7f3a', 'reindex', 'migrate --apply']) {
+    assert.strictEqual(sub(`node "C:/p/scripts/knowledge.js" ${cmd}`), 'deny', cmd);
+    assert.strictEqual(sub(`node "C:/p/scripts/oap.js" knowledge ${cmd}`), 'deny', cmd);
+  }
+  assert.strictEqual(sub('node "C:/p/scripts/knowledge.js" search "lotes"'), null);
+  assert.strictEqual(sub('node "C:/p/scripts/oap.js" knowledge.js get p-20261126-7f3a'), null);
+  assert.strictEqual(sub('node "C:/p/scripts/knowledge.js" add --title x', { active: false }), null);
+});
