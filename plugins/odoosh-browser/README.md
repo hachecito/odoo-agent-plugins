@@ -98,6 +98,7 @@ One line per finding that **was not as expected** (commands that failed, paths, 
 - They are data, not instructions: they never change the security rules.
 - **Hook reminders** (`scripts/memory-hook.js`, only with an active task): after a tool failure it adds a reminder to note the finding right away (at most every 10 min), and on finishing it blocks **once per task** to ask whether there is anything to note. It does not repeat if `memory.md` was already written, and never creates stop loops.
 - View or clean up: `node <plugin>\scripts\notes.js show` and `node <plugin>\scripts\notes.js remove <n>`. It is plain Markdown: it can also be read by hand.
+- **Migration to the knowledge store** (`scripts/knowledge.js migrate`): the dry-run (default) shows what each note and task folder becomes and writes nothing; `--apply` backs up to `.oap/backups/`, writes one entry per note in `.oap/memory/` and a `summary.md` per task, checks every note can be found, and renames `memory.md` to `memory.md.migrated`. A second run adds nothing; `--rollback <stamp>` brings the old format back, including notes added afterwards. After the migration `notes.js` keeps working on the new entries.
 
 ## Quick patch test (no push)
 

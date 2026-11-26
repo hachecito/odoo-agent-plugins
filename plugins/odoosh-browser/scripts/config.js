@@ -58,6 +58,9 @@ function main() {
     const problems = validateConfig(loaded.config);
     printProblems(problems);
     if (loaded.legacy) console.log('Warning: files in the old location (.claude/). Run "config.js migrate" to move them to .oap/.');
+    if (require('./lib/knowledge/migrate').needsMigration(loaded.root)) {
+      console.log('Warning: project memory in the old format. Review "knowledge.js migrate" (dry-run) and apply it with "knowledge.js migrate --apply".');
+    }
     process.exit(problems.length ? 1 : 0);
   } else if (cmd === 'migrate') {
     const res = migrateLegacy(loaded.root);

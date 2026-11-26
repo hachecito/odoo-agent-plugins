@@ -100,9 +100,9 @@ function renderResult(n, r) {
   return [
     `[${n}] ${row.id}  ${row.scope} · ${state} · ${row.category}${tags}${vers}`,
     `    ${row.title}`,
-    `    ${row.summary}`,
+    row.summary !== row.title ? `    ${row.summary}` : null,
     `    ${displayPath(r.store, row)}`,
-  ].join('\n');
+  ].filter((l) => l !== null).join('\n');
 }
 
 /**
