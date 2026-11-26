@@ -88,7 +88,7 @@ function main() {
     return;
   }
   if (!/^[a-z-]+\.js$/.test(script || '') || !fs.existsSync(path.join(dir, script))) {
-    console.error('Usage: oap.js <run-state|notes|config|report|ssh-check>[.js] [args...]');
+    console.error('Usage: oap.js <run-state|notes|knowledge|config|report|ssh-check>[.js] [args...]');
     process.exit(1);
   }
   const res = spawnSync(process.execPath, [path.join(dir, script), ...args], { stdio: 'inherit' });

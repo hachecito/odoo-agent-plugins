@@ -18,14 +18,14 @@ const CHROME_TOOL = /^mcp__(plugin_[^_]+_)?claude-in-chrome__/;
 const OTHER_BROWSER_TOOL = /^mcp__.*(chrome[-_]devtools|playwright|puppeteer|browsermcp|browser[-_]use|browserbase)/i;
 const SHELL_TOOLS = new Set(['Bash', 'PowerShell']);
 const FILE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
-// Guard config and learned notes may only change through their scripts or with user confirmation.
-// Current and legacy (plugin <= 0.3) names are both protected.
-const CONFIG_FILE = /(^|[\\/])(\.oap[\\/](memory\.md|odoosh-browser[\\/]config\.json)|\.claude[\\/](odoosh-browser|odoo-agent)(-notes)?\.json)$/;
-const PROTECTED_PATH = /(\.oap[\\/](memory\.md|odoosh-browser[\\/]config\.json)|(odoosh-browser|odoo-agent)(-notes)?\.json)/;
+// Guard config, learned notes and the knowledge stores (.oap/memory/, ~/.oap/knowledge/) may only change through
+// their scripts or with user confirmation. Current and legacy (plugin <= 0.3) names are both protected.
+const CONFIG_FILE = /(^|[\\/])(\.oap[\\/](memory\.md|odoosh-browser[\\/]config\.json)|\.claude[\\/](odoosh-browser|odoo-agent)(-notes)?\.json)$|(^|[\\/])\.oap[\\/](memory|knowledge)[\\/]/;
+const PROTECTED_PATH = /(\.oap[\\/](memory\.md|odoosh-browser[\\/]config\.json|memory[\\/]|knowledge[\\/])|(odoosh-browser|odoo-agent)(-notes)?\.json)/;
 // Programs that write, copy, move or delete the file named in their arguments.
 const WRITER_PROGRAMS = new Set(['tee', 'cp', 'mv', 'rm', 'del', 'copy', 'move', 'set-content', 'add-content', 'out-file', 'copy-item', 'move-item', 'remove-item', 'new-item', 'sc', 'ac', 'ni']);
 // Yolo mode: these scripts of the Odoo agent plugins run without a prompt, only from a real plugin root (see trustedRoots).
-const YOLO_SCRIPTS = new Set(['run-state.js', 'notes.js', 'report.js', 'ssh-check.js', 'config.js', 'oap.js', 'tasks.js', 'hotpatch.js', 'diag.js']);
+const YOLO_SCRIPTS = new Set(['run-state.js', 'notes.js', 'knowledge.js', 'report.js', 'ssh-check.js', 'config.js', 'oap.js', 'tasks.js', 'hotpatch.js', 'diag.js']);
 let trustedRootsCache = null;
 
 /**
@@ -419,6 +419,11 @@ function evaluateSsh(args, ctx) {
 function evaluateConfigWrite(tokens) {
   const isConfigCli = tokens.some((t) => /(^|[\\/])config\.js$/.test(t)) && tokens.some((t) => ['init', 'set-staging', 'set-ssh', 'set-autonomy', 'migrate'].includes(t));
   if (isConfigCli) return { decision: ASK, reason: 'Change to the plugin configuration (staging/production branch, SSH, autonomy or file migration): confirm with the user.' };
+  // Removing knowledge (also an entry promoted to every project) or migrating memory always asks the user.
+  const kIdx = tokens.findIndex((t, i) => /(^|[\\/])knowledge\.js$/.test(t) || (t === 'knowledge' && /(^|[\\/])oap\.js$/.test(tokens[i - 1] || '')));
+  if (kIdx >= 0 && ['remove', 'migrate'].includes(tokens[kIdx + 1]) && !(tokens[kIdx + 1] === 'migrate' && tokens.includes('--dry-run'))) {
+    return { decision: ASK, reason: `knowledge.js ${tokens[kIdx + 1]}: confirm with the user.` };
+  }
   // Only real writes count: a redirection to the file or a writing program naming it (reading it with cat is free).
   const redirected = (tokens.redirects || []).some((t) => PROTECTED_PATH.test(t));
   const prog = programName(tokens[0]);
@@ -432,17 +437,18 @@ function evaluateConfigWrite(tokens) {
 
 const RUN_WRITE_CMDS = new Set(['init', 'state', 'evidence', 'cycle', 'close']);
 const NOTES_WRITE_CMDS = new Set(['add', 'remove', 'migrate']);
+const KNOWLEDGE_WRITE_CMDS = new Set(['add', 'update', 'deprecate', 'remove', 'reindex', 'migrate']);
 
 /**
- * Detect a subagent writing the run state or the shared memory (directly or through oap.js).
+ * Detect a subagent writing the run state, the shared memory or the knowledge stores (directly or through oap.js).
  * @param {string[]} tokens - segment tokens
  * @returns {{decision: string, reason: string}|null} decision
  */
 function evaluateSubagentStateWrite(tokens) {
   for (let i = 0; i < tokens.length - 1; i++) {
-    const m = /(^|[\\/])(run-state|notes)(\.js)?$/.exec(tokens[i]);
+    const m = /(^|[\\/])(run-state|notes|knowledge)(\.js)?$/.exec(tokens[i]);
     if (!m || (!m[3] && !/(^|[\\/])oap\.js$/.test(tokens[i - 1] || ''))) continue;
-    const writes = m[2] === 'run-state' ? RUN_WRITE_CMDS : NOTES_WRITE_CMDS;
+    const writes = { 'run-state': RUN_WRITE_CMDS, notes: NOTES_WRITE_CMDS, knowledge: KNOWLEDGE_WRITE_CMDS }[m[2]];
     if (writes.has(tokens[i + 1])) {
       return { decision: DENY, reason: `${m[2]}.js ${tokens[i + 1]} from a subagent blocked: hand the evidence or lesson back to the orchestrator, which records it.` };
     }
