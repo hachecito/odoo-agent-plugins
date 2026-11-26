@@ -439,7 +439,7 @@ function evaluateConfigWrite(tokens) {
 
 const RUN_WRITE_CMDS = new Set(['init', 'state', 'evidence', 'cycle', 'close']);
 const NOTES_WRITE_CMDS = new Set(['add', 'remove', 'migrate']);
-const KNOWLEDGE_WRITE_CMDS = new Set(['add', 'update', 'deprecate', 'remove', 'reindex', 'migrate']);
+const KNOWLEDGE_WRITE_CMDS = new Set(['add', 'update', 'deprecate', 'remove', 'reindex', 'migrate', 'task-summary']);
 
 /**
  * Detect a subagent writing the run state, the shared memory or the knowledge stores (directly or through oap.js).

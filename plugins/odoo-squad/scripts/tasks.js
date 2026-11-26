@@ -10,7 +10,7 @@ const STATUSES = ['in-progress', 'completed', 'blocked', 'abandoned', 'migrated'
 const LEGACY_STATUSES = { 'en-curso': 'in-progress', completada: 'completed', bloqueada: 'blocked', abandonada: 'abandoned', migrada: 'migrated' };
 const INDEX_HEADER = '# Squad tasks\n\nOne line per task: id · status · title. Each task folder holds task.md, aclaraciones.md (clarifications), plan.md and hallazgos.md (findings).\n\n';
 const LINE_RE = /^- (\S+) · (\S+) · (.*)$/;
-const FINDINGS_HEADER = '# Task findings\n\nDetails that only apply to this task. Reusable lessons go to .oap/memory.md.\n\n';
+const FINDINGS_HEADER = '# Task findings\n\nDetails that only apply to this task. Reusable lessons go to the project memory (knowledge.js add).\n\n';
 
 /**
  * Write a file atomically (temp file in the same folder, then rename). If Windows keeps refusing the rename (target

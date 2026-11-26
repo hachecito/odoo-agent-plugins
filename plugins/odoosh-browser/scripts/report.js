@@ -36,6 +36,18 @@ function render(run) {
     lines.push('', '## Not yet verified', '');
     [...v.missing, ...v.skipped].forEach((k) => lines.push(`- ${k}`));
   }
+  const k = run.knowledge || [];
+  if (k.length) {
+    lines.push('', '## Knowledge', '');
+    const LABEL = {
+      added: 'Added to project memory', promoted: 'Promoted to global knowledge', 'confirmed-global': 'Already in global knowledge (confirmation added)',
+      'global-updated': 'Global copy updated', 'kept-in-project': 'Verified but kept in the project',
+    };
+    for (const e of k) {
+      const where = e.global ? ` → ${e.global} (remove from global: knowledge.js remove ${e.global})` : '';
+      lines.push(`- ${LABEL[e.action] || e.action}: ${e.id} "${e.title}"${where}${e.reason ? ` — ${e.reason}` : ''}`);
+    }
+  }
   lines.push('', '## History', '');
   run.history.forEach((h) => lines.push(`- ${h.at} ${h.state}${h.note ? ` — ${h.note}` : ''}`));
   return lines.join('\n') + '\n';

@@ -303,3 +303,51 @@ test('duplicates: distinct real lessons do not collide; the refusal shows the ov
   assert.match(dup.out, /\d+% of the title and summary words in common/);
   fs.rmSync(r.base, { recursive: true, force: true });
 });
+
+test('task-summary, run recording and report: what was added and promoted is listed with how to undo it', () => {
+  const r = repo();
+  const folder = path.join(r.root, '.oap', 'odoo-squad', 'tasks', '20261126-fix-lotes');
+  fs.mkdirSync(folder, { recursive: true });
+  fs.writeFileSync(path.join(folder, 'task.md'), '# Corregir lotes en recepciones\n\nLas recepciones parciales pierden el lote.\n');
+  const runFile = path.join(r.root, '.oap', 'odoosh-browser', 'run.json');
+  fs.writeFileSync(runFile, JSON.stringify({ task: 'x', staging_branch: 'stg', state: 'IMPLEMENTATION', started_at: new Date().toISOString(), history: [], evidence: [], fix_cycles: 0 }));
+  cli(r, 'add', '--title', 'Lotes y series en tests de stock', '--summary', 'Usar lot_producer_id en Odoo 18 para los tests de lotes.', '--category', 'tests',
+    '--status', 'verified', '--evidence', 'odoo/odoo@18.0:addons/stock/models/stock_lot.py:10');
+  const ts = cli(r, 'task-summary', '--folder', folder, '--summary', 'Se conserva el lote al validar recepciones parciales.', '--outcome', 'completed', '--modules', 'stock_custom');
+  assert.match(ts.out, /Task summary t-20261126-\S+ \(completed\)/);
+  assert.match(cli(r, 'search', 'recepciones lote', '--scope', 'task').out, /task · completed[\s\S]*Corregir lotes en recepciones/);
+  // Rewriting keeps the same id (idempotent with the migration formula).
+  const again = cli(r, 'task-summary', '--folder', folder, '--summary', 'Corregido y verificado en staging.', '--outcome', 'completed');
+  assert.strictEqual(/Task summary (t-\S+)/.exec(again.out)[1], /Task summary (t-\S+)/.exec(ts.out)[1]);
+  const run = JSON.parse(fs.readFileSync(runFile, 'utf8'));
+  assert.deepStrictEqual(run.knowledge.map((k) => k.action), ['added', 'promoted']);
+  const { render } = require('../scripts/report');
+  const report = render(run);
+  assert.match(report, /## Knowledge[\s\S]*Added to project memory: p-[\s\S]*Promoted to global knowledge: p-\S+ "Lotes y series en tests de stock" → g-\S+ \(remove from global: knowledge\.js remove g-/);
+  assert.match(cli(r, 'task-summary', '--folder', path.join(r.root, '..'), '--summary', 'x').out, /No task\.md|outside the store/);
+  fs.rmSync(r.base, { recursive: true, force: true });
+});
+
+test('context in a project not migrated yet starts with its old notes', () => {
+  const r = repo();
+  fs.writeFileSync(path.join(r.root, '.oap', 'memory.md'), '# Project memory (.oap)\n\n- **odoo-sh** Host SSH del build staging: 1@p-staging-1.dev.odoo.com _(2026-11-12)_\n');
+  const out = cli(r, 'context', '--text', 'cualquier tarea').out;
+  assert.match(out, /## Project notes \(old format: migrate with knowledge\.js migrate\)\n- \(odoo-sh\) Host SSH del build staging/);
+  fs.rmSync(r.base, { recursive: true, force: true });
+});
+
+test('context stays within its budget with a full old memory.md and many entries; --task reads the task file', () => {
+  const r = repo();
+  const words = 'stock picking lotes series recepcion factura asiento ruta almacen tarifa'.split(' ');
+  const notes = Array.from({ length: 100 }, (_, i) => `- **tests** Nota ${i} sobre ${words[i % 10]} ${'con detalle de lotes y recepciones '.repeat(16).trim()} _(2026-11-1${i % 10})_`);
+  fs.writeFileSync(path.join(r.root, '.oap', 'memory.md'), `# Project memory (.oap)\n\n${notes.join('\n')}\n`);
+  const store = projectStore(r.root);
+  for (let i = 1; i < 80; i++) put(store, { id: `p-20261126-${String(i).padStart(4, '0')}`, title: `Lotes en recepciones ${i}`, summary: 'otro texto de relleno sobre lotes '.repeat(10).trim() });
+  const task = path.join(r.base, 'task.md');
+  fs.writeFileSync(task, '# Corregir lotes en recepciones\n\nLas recepciones parciales pierden el lote.\n');
+  const out = cli(r, 'context', '--task', task, '--budget', '1500').out;
+  assert.match(out, /## Project notes \(old format/);
+  assert.match(out, /## Relevant knowledge/);
+  assert.ok(out.length <= 1500 * 4 + 300, `${out.length} chars`);
+  fs.rmSync(r.base, { recursive: true, force: true });
+});

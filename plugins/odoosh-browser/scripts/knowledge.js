@@ -26,6 +26,7 @@ const USAGE = `Usage: knowledge.js <command> [options]
   deprecate <id> [--by <id>]
   remove <id>
   validate [<id>]
+  task-summary --folder <task folder> --summary "..." [--outcome completed|blocked|abandoned|in-progress] [--modules a,b] [--files a,b]
   migrate [--dry-run] | --apply | --history | --rollback <stamp>
   reindex [--full]
   stats
@@ -110,6 +111,19 @@ function bodyFrom(flags) {
 }
 
 /**
+ * Record a knowledge action in the active run (run.json), so the final report lists it. No active run: nothing.
+ * @param {object} loaded - loaded project config
+ * @param {object} item - {action, id, title, global?, reason?}
+ */
+function recordInRun(loaded, item) {
+  const { loadRun, saveRun, isRunActive } = require('./lib/run');
+  if (!isRunActive(loaded.root)) return;
+  const run = loadRun(loaded.root);
+  run.knowledge = [...(run.knowledge || []), { at: new Date().toISOString(), ...item }];
+  saveRun(loaded.root, run);
+}
+
+/**
  * Promote a verified project entry if it qualifies, record promoted_to, and describe the outcome.
  * @param {object} stores - {project, global}
  * @param {object} loaded - loaded project config
@@ -121,7 +135,11 @@ function autoPromote(stores, loaded, data, body) {
   if (data.scope !== 'project' || data.status !== 'verified' || data.promoted_to || data.no_promote) return null;
   const res = promote(stores.global, data, body, { projectTerms: projectTerms(loaded.root, loaded.config) });
   const gid = res.promoted || res.merged;
-  if (!gid) return `Kept in the project (not promoted to global): ${res.skipped.join(' ')}`;
+  if (!gid) {
+    recordInRun(loaded, { action: 'kept-in-project', id: data.id, title: data.title, reason: res.skipped.join(' ') });
+    return `Kept in the project (not promoted to global): ${res.skipped.join(' ')}`;
+  }
+  recordInRun(loaded, { action: res.promoted ? 'promoted' : 'confirmed-global', id: data.id, title: data.title, global: gid });
   withLock(storeLock(stores.project), () => {
     const file = findEntryFile(stores.project, data.id);
     const cur = readEntryFile(file);
@@ -174,7 +192,33 @@ function main() {
     const task = one(flags, 'task');
     const text = task ? fs.readFileSync(path.resolve(task), 'utf8') : one(flags, 'text');
     if (!text) fail('context needs --task <file> or --text "..."');
-    console.log(context(both, text, { budget: Number(one(flags, 'budget')) || 1500, odoo }));
+    const budget = Number(one(flags, 'budget')) || 1500;
+    // Not migrated yet: the old notes are still the project memory, so they go first, within 40% of the budget;
+    // the rest of the context then gets the other 60%, so the total stays within the budget.
+    const { loadNotes } = require('./lib/notes');
+    const { notes } = loadNotes(loaded.root);
+    const legacy = notes.length > 0 && fs.existsSync(path.join(loaded.root, '.oap', 'memory.md'));
+    let out = context(both, text, { budget: legacy ? Math.floor(budget * 0.6) : budget, odoo });
+    if (legacy) {
+      const max = Math.floor(budget * 4 * 0.4);
+      const lines = [];
+      let used = 0;
+      for (const n of notes) {
+        const l = `- ${n.tag ? `(${n.tag}) ` : ''}${n.text}`;
+        if (used + l.length > max) break;
+        lines.push(l);
+        used += l.length + 1;
+      }
+      const more = notes.length - lines.length;
+      const rest = out.startsWith('No project memory or knowledge yet') ? '' : out;
+      out = [
+        '## Project notes (old format: migrate with knowledge.js migrate)',
+        ...lines,
+        more ? `(${more} more: notes.js show)` : '',
+        rest,
+      ].filter(Boolean).join('\n');
+    }
+    console.log(out.trim());
   } else if (cmd === 'add') {
     const date = today();
     const data = {
@@ -202,11 +246,12 @@ function main() {
         + `Update it (knowledge.js update ${added.dup.id} ...) or, if they are different topics, pass --force-new.`);
     }
     console.log(`Added ${added.id} (${data.status}) in .oap/memory/entries/${data.category}/`);
+    recordInRun(loaded, { action: 'added', id: added.id, title: data.title, status: data.status });
     const note = autoPromote(stores, loaded, data, body);
     if (note) console.log(note);
   } else if (cmd === 'update' || cmd === 'deprecate') {
     const id = pos[0];
-    if (id && id[0] === 't') fail('Task summaries are written by tasks.js.');
+    if (id && id[0] === 't') fail('Task summaries are written with knowledge.js task-summary.');
     const store = storeOf(id, stores);
     const res = withLock(storeLock(store), () => {
       const file = findEntryFile(store, id);
@@ -241,7 +286,10 @@ function main() {
       console.log(`Its global copy ${res.data.promoted_to} is still active: deprecate it too if it no longer holds anywhere.`);
     } else if (res.data.promoted_to) {
       const g = updateGlobalCopy(stores.global, res.data.promoted_to, res.data, res.body, { projectTerms: projectTerms(loaded.root, loaded.config) });
-      if (g.updated) console.log(`Global copy ${g.updated} updated too.`);
+      if (g.updated) {
+        console.log(`Global copy ${g.updated} updated too.`);
+        recordInRun(loaded, { action: 'global-updated', id, title: res.data.title, global: g.updated });
+      }
       else if (g.missing) console.log(`Global copy ${res.data.promoted_to} not found (removed?): run knowledge.js validate.`);
       else console.log(`Global copy ${res.data.promoted_to} NOT updated, it keeps the previous text: ${g.skipped.join(' ')}`);
     }
@@ -290,6 +338,42 @@ function main() {
     }
     console.log(bad ? `${bad} problem(s).` : 'All entries valid.');
     if (bad) process.exit(1);
+  } else if (cmd === 'task-summary') {
+    const { hashText, cut } = require('./lib/knowledge/migrate');
+    const { safeJoin } = require('./lib/knowledge/store');
+    const { parseEntry, serializeEntry } = require('./lib/knowledge/schema');
+    const { writeFileAtomic } = require('./lib/fsatomic');
+    const name = path.basename(String(one(flags, 'folder') || '').replace(/[\\/]+$/, ''));
+    if (!name) fail('task-summary needs --folder <.oap/odoo-squad/tasks/<id>>');
+    const dir = safeJoin(stores.project.tasksDir, name);
+    if (!fs.existsSync(path.join(dir, 'task.md'))) fail(`No task.md in ${dir}`);
+    const outcome = one(flags, 'outcome') || 'completed';
+    if (!['in-progress', 'completed', 'blocked', 'abandoned'].includes(outcome)) fail('--outcome must be in-progress, completed, blocked or abandoned');
+    const summary = one(flags, 'summary');
+    if (!summary) fail('task-summary needs --summary "what was done and the result"');
+    const file = path.join(dir, 'summary.md');
+    const prev = fs.existsSync(file) ? parseEntry(fs.readFileSync(file, 'utf8')).data : {};
+    const m = /^(\d{4})(\d{2})(\d{2})/.exec(name);
+    const created = prev.created || (m ? `${m[1]}-${m[2]}-${m[3]}` : today());
+    const heading = /^#\s+(.+?)\s*$/m.exec(fs.readFileSync(path.join(dir, 'task.md'), 'utf8'));
+    const docs = ['task.md', 'aclaraciones.md', 'plan.md', 'hallazgos.md'].filter((f) => fs.existsSync(path.join(dir, f)));
+    const data = {
+      ...prev, id: prev.id || `t-${created.replace(/-/g, '')}-${hashText(`task:${name}`).slice(0, 6)}`,
+      title: cut(one(flags, 'title') || prev.title || (heading && heading[1]) || name, 120), type: 'task', scope: 'task', category: 'task',
+      tags: flags.tag ? many(flags, 'tag') : (prev.tags || []), odoo_versions: flags.odoo ? many(flags, 'odoo') : (prev.odoo_versions || (odoo ? [odoo] : [])),
+      status: 'observed', summary: cut(summary, 400), evidence: prev.evidence || [], superseded_by: null, promoted_to: null,
+      created, updated: today(), schema_version: SCHEMA_VERSION, outcome,
+      modules: flags.modules ? many(flags, 'modules') : (prev.modules || []), files: flags.files ? many(flags, 'files') : (prev.files || []),
+    };
+    const body = one(flags, 'body-file') ? fs.readFileSync(path.resolve(one(flags, 'body-file')), 'utf8')
+      : `## Result\n${summary}\n\n## Files\n${docs.join(', ')} in .oap/odoo-squad/tasks/${name}/\n`;
+    const problems = validateEntry(data, body);
+    if (problems.length) fail(`Summary not written: ${problems.join(' ')}`);
+    withLock(storeLock(stores.project), () => {
+      writeFileAtomic(file, serializeEntry(data, body));
+      loadIndex(stores.project, { locked: true });
+    });
+    console.log(`Task summary ${data.id} (${outcome}) written to .oap/odoo-squad/tasks/${name}/summary.md`);
   } else if (cmd === 'migrate') {
     const { planMigration, renderPlan, applyMigration, rollbackMigration, migrationLog } = require('./lib/knowledge/migrate');
     if (one(flags, 'rollback')) {

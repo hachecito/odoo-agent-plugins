@@ -9,12 +9,14 @@ const NOTES_JS = path.resolve(__dirname, '..', 'notes.js').split(path.sep).join(
 const ADD_CMD = `node "${NOTES_JS}" add [--tag t] --text "I thought X, actually Y" --source "<task>"`;
 
 /**
- * Tell whether memory.md was written since the run started.
+ * Tell whether something was noted since the run started: memory.md written (old format) or an entry added to the
+ * knowledge store (knowledge.js records it in run.json; notes.js add goes there once the project is migrated).
  * @param {string} root - repo root
  * @param {object} run - run state
  * @returns {boolean} true if a note was added during this run
  */
 function memoryTouchedSinceStart(root, run) {
+  if ((run.knowledge || []).some((k) => k.action === 'added')) return true;
   const p = agentFile(root, 'memory');
   return fs.existsSync(p) && fs.statSync(p).mtimeMs >= Date.parse(run.started_at);
 }

@@ -1,6 +1,6 @@
 {
   "name": "odoosh-browser",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Completes Odoo tasks end to end: code, tests, commit, push to an Odoo.sh staging branch and verification of build, logs and tests, with deterministic safeguards.",
   "author": { "name": "hachecito" },
   "license": "MIT",
