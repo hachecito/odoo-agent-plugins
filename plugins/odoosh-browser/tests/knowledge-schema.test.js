@@ -155,3 +155,19 @@ test('global: project data, personal data and project categories block promotion
   // A project term inside a longer name is not a match.
   assert.deepStrictEqual(globalProblems(base, 'El módulo sale_custom_extra', { projectTerms: ['sale_custom'] }), []);
 });
+
+test('secrets: long lowercase slugs and identifiers are not keys; long mixed runs still are', () => {
+  for (const ok of [
+    'source: 20261123-modula-exportar-componentes-de-kits-en-el-informe',
+    'campo x_studio_fecha_de_entrega_prevista_por_el_cliente_final_largo',
+  ]) assert.strictEqual(secretReason(ok), null, ok);
+  const mixed = ['Ab3', 'xY9', 'Qw7'].join('').repeat(17); // 51 key-like characters, built at runtime
+  assert.notStrictEqual(secretReason(`valor ${mixed}`), null);
+  assert.notStrictEqual(secretReason(`digest ${'0123456789abcdef'.repeat(4)}`), null);
+});
+
+test('validate: task summaries quote the request, so only the secret check applies to them', () => {
+  const task = entry({ id: 't-20261126-7f3a', scope: 'task', type: 'task', category: 'task', summary: 'El cliente pide hacer merge a producción el viernes' });
+  assert.deepStrictEqual(validateEntry(task, '## Task\nx\n'), []);
+  assert.notStrictEqual(validateEntry({ ...task, scope: 'project', id: 'p-20261126-7f3a' }, '').length, 0);
+});

@@ -25,7 +25,11 @@ The plugin's protections (`guard.js` hook) **only apply in repos with this file*
    - Change staging: `node "${CLAUDE_PLUGIN_ROOT}/scripts/config.js" set-staging <branch>`
    - Validate: `node "${CLAUDE_PLUGIN_ROOT}/scripts/config.js" validate` (must report a valid configuration).
 5. **`.oap/` folder kept out of the client's repo**: `config.js init` adds `.oap/` to `.git/info/exclude` (local exclusion; the client's `.gitignore` is not modified). If the repo has files in `.claude/odoosh-browser*.json` or `.claude/odoo-agent*.json`, propose `config.js migrate` (asks for confirmation): it moves them to `.oap/` and converts the old notes into `.oap/memory.md`.
-6. **Check channels** and report the result to the user:
+6. **Old project memory**: if `config.js validate` warns that the memory is in the old format (`.oap/memory.md` or task folders without `summary.md`), migrate it before the first task:
+   - Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/knowledge.js" migrate` (dry-run: writes nothing) and show the user the totals and any skipped note with its reason.
+   - With the user's OK, `node "${CLAUDE_PLUGIN_ROOT}/scripts/knowledge.js" migrate --apply` (the guard asks for confirmation). It backs up to `.oap/backups/`, verifies every note, renames `memory.md` to `memory.md.migrated` and writes a report in `.oap/memory/migrations/`. Running it twice adds nothing.
+   - If something looks wrong: `knowledge.js migrate --rollback <stamp>` (stamp from `migrate --history`).
+7. **Check channels** and report the result to the user:
    - **Claude in Chrome**: check that `mcp__claude-in-chrome__*` tools are available. If not, tell the user to start with `claude --chrome` or run `/chrome`. A plugin cannot enable it. Do not replace it with another browser MCP (`chrome-devtools`, Playwright…).
    - **GitHub**: confirm the `github` MCP responds (e.g. read the last commit of the staging branch).
    - **Stages on Odoo.sh** (if Claude in Chrome is available): open the project on Odoo.sh and check in the left panel that the staging branch is under *Staging* and the branches under *Production* match `production_branches` (see `skills/odoo-sh-remote/reference/odoo-sh-ui.md`). If they do not match, warn and fix the config with the user.

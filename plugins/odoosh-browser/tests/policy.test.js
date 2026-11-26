@@ -353,6 +353,8 @@ test('knowledge stores: direct edits ask, reads are free, remove and migrate ask
   assert.strictEqual(sh(`node "${SQUAD_SCRIPTS}/oap.js" knowledge remove p-20261126-7f3a`), 'ask');
   assert.strictEqual(sh(`node "${OWN_SCRIPTS}/knowledge.js" migrate --apply`), 'ask');
   assert.strictEqual(sh(`node "${OWN_SCRIPTS}/knowledge.js" migrate --dry-run`), 'allow');
+  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/knowledge.js" migrate`), 'allow');
+  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/knowledge.js" migrate --rollback 20261126-101010`), 'ask');
 });
 
 test('subagents can search knowledge but not write it during a task', () => {

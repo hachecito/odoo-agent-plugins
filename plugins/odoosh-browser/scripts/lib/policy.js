@@ -419,10 +419,12 @@ function evaluateSsh(args, ctx) {
 function evaluateConfigWrite(tokens) {
   const isConfigCli = tokens.some((t) => /(^|[\\/])config\.js$/.test(t)) && tokens.some((t) => ['init', 'set-staging', 'set-ssh', 'set-autonomy', 'migrate'].includes(t));
   if (isConfigCli) return { decision: ASK, reason: 'Change to the plugin configuration (staging/production branch, SSH, autonomy or file migration): confirm with the user.' };
-  // Removing knowledge (also an entry promoted to every project) or migrating memory always asks the user.
+  // Removing knowledge (also an entry promoted to every project) or applying / undoing a memory migration always asks
+  // the user; the migration dry-run (default) and --status only read.
   const kIdx = tokens.findIndex((t, i) => /(^|[\\/])knowledge\.js$/.test(t) || (t === 'knowledge' && /(^|[\\/])oap\.js$/.test(tokens[i - 1] || '')));
-  if (kIdx >= 0 && ['remove', 'migrate'].includes(tokens[kIdx + 1]) && !(tokens[kIdx + 1] === 'migrate' && tokens.includes('--dry-run'))) {
-    return { decision: ASK, reason: `knowledge.js ${tokens[kIdx + 1]}: confirm with the user.` };
+  const kCmd = kIdx >= 0 ? tokens[kIdx + 1] : null;
+  if (kCmd === 'remove' || (kCmd === 'migrate' && tokens.some((t) => t === '--apply' || t === '--rollback'))) {
+    return { decision: ASK, reason: `knowledge.js ${kCmd}: confirm with the user.` };
   }
   // Only real writes count: a redirection to the file or a writing program naming it (reading it with cat is free).
   const redirected = (tokens.redirects || []).some((t) => PROTECTED_PATH.test(t));

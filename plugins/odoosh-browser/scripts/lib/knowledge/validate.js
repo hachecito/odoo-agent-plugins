@@ -24,8 +24,11 @@ const SECRET_PATTERNS = [
   /\beyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]{10,}/, // JWT
   /\b[a-z][\w+.-]*:\/\/[^\s/:@]+:[^\s/@]+@/i, // URL with user:password
   /\b(AKIA[0-9A-Z]{16}|AIza[\w-]{35}|xox[abprs]-[\w-]{10,}|sk-[A-Za-z0-9_-]{20,})\b/,
-  /[A-Za-z0-9+=_-]{48,}/,
 ];
+// Any other run of 48+ key-like characters counts as a possible key, unless it is lowercase words joined by - or _
+// (task folder slugs such as 20261123-export-kit-components-..., long Odoo field or module names).
+const LONG_RUN = /[A-Za-z0-9+=_-]{48,}/g;
+const WORDS_RUN = /^[a-z0-9]+([-_][a-z0-9]+)+$/;
 // Global knowledge is shared by every project: no personal data, hosts or links outside public documentation.
 const GLOBAL_PATTERNS = [
   // The domain must end in a letter TLD, so code references like odoo/odoo@18.0:addons/... are not e-mails.
@@ -54,7 +57,9 @@ function policyReason(text) {
  * @returns {string|null} reason
  */
 function secretReason(text) {
-  return SECRET_PATTERNS.some((re) => re.test(text)) ? 'The text looks like it contains a secret or credential.' : null;
+  const s = String(text);
+  const longKey = (s.match(LONG_RUN) || []).some((run) => !WORDS_RUN.test(run));
+  return longKey || SECRET_PATTERNS.some((re) => re.test(s)) ? 'The text looks like it contains a secret or credential.' : null;
 }
 
 /**
@@ -84,7 +89,9 @@ function validateEntry(data, body) {
   if (!isDate(data.created) || !isDate(data.updated)) p.push('created and updated must be dates (YYYY-MM-DD).');
   if (data.schema_version !== SCHEMA_VERSION) p.push(`schema_version must be ${SCHEMA_VERSION}.`);
   const text = [data.title, data.summary, ...(data.evidence || []), body].filter(Boolean).join('\n');
-  const reason = policyReason(text) || secretReason(text);
+  // A task summary quotes the client's request, which is data about that task and never promoted: only the
+  // secret check applies to it. Lessons and knowledge also get the policy check.
+  const reason = (data.scope === 'task' ? null : policyReason(text)) || secretReason(text);
   if (reason) p.push(reason);
   return p;
 }

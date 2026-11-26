@@ -26,6 +26,7 @@ const USAGE = `Usage: knowledge.js <command> [options]
   deprecate <id> [--by <id>]
   remove <id>
   validate [<id>]
+  migrate [--dry-run] | --apply | --history | --rollback <stamp>
   reindex [--full]
   stats
 Options valid everywhere: --dir <repo path>`;
@@ -38,7 +39,7 @@ Options valid everywhere: --dir <repo path>`;
 function parseArgs(argv) {
   const pos = [];
   const flags = {};
-  const BOOL = new Set(['include-deprecated', 'force-new', 'full', 'json']);
+  const BOOL = new Set(['include-deprecated', 'force-new', 'full', 'json', 'apply', 'dry-run', 'history']);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith('--')) { pos.push(a); continue; }
@@ -289,6 +290,24 @@ function main() {
     }
     console.log(bad ? `${bad} problem(s).` : 'All entries valid.');
     if (bad) process.exit(1);
+  } else if (cmd === 'migrate') {
+    const { planMigration, renderPlan, applyMigration, rollbackMigration, migrationLog } = require('./lib/knowledge/migrate');
+    if (one(flags, 'rollback')) {
+      const res = rollbackMigration(loaded.root, one(flags, 'rollback'));
+      if (!res.ok) fail(res.message);
+      console.log(res.message);
+    } else if (one(flags, 'apply')) {
+      const res = applyMigration(loaded.root);
+      console.log(res.report);
+      if (!res.ok) fail(`Migration not applied: ${res.errors.join(' | ')}`);
+      if (!res.nothing) console.log(`Migration ${res.stamp} applied.`);
+    } else if (one(flags, 'history')) {
+      const log = migrationLog(loaded.root);
+      console.log(log.length ? log.map((r) => `${r.stamp} ${r.status}${r.notes !== undefined ? ` · notes ${r.notes} · tasks ${r.tasks}` : ''}`).join('\n') : 'No migrations yet.');
+    } else {
+      console.log(renderPlan(planMigration(loaded.root), 'Memory migration: dry-run (nothing written)'));
+      console.log('Apply with: knowledge.js migrate --apply (asks for confirmation)');
+    }
   } else if (cmd === 'reindex') {
     for (const store of both) {
       const { rows, invalid, changed } = loadIndex(store, { full: Boolean(one(flags, 'full')) });
