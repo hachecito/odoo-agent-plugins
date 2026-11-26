@@ -13,6 +13,36 @@ const LINE_RE = /^- (\S+) · (\S+) · (.*)$/;
 const FINDINGS_HEADER = '# Task findings\n\nDetails that only apply to this task. Reusable lessons go to .oap/memory.md.\n\n';
 
 /**
+ * Write a file atomically (temp file in the same folder, then rename). If Windows keeps refusing the rename (target
+ * held open), it writes in place as before. odoo-squad has no runtime dependency on odoosh-browser, so this mirrors
+ * the writer in its fsatomic.js.
+ * @param {string} file - target path
+ * @param {string} data - content (utf8)
+ */
+function writeFileAtomic(file, data) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const tmp = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2, 8)}.tmp`);
+  fs.writeFileSync(tmp, data, { encoding: 'utf8', flag: 'wx' });
+  try {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        fs.renameSync(tmp, file);
+        return;
+      } catch (err) {
+        if (!['EPERM', 'EACCES', 'EBUSY'].includes(err.code)) throw err;
+        if (attempt >= 10) {
+          fs.writeFileSync(file, data, 'utf8');
+          return;
+        }
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25 + Math.floor(Math.random() * 25 * (attempt + 1)));
+      }
+    }
+  } finally {
+    try { fs.unlinkSync(tmp); } catch { /* renamed, or already gone */ }
+  }
+}
+
+/**
  * Find the configured repo root (.oap/odoosh-browser/config.json), walking up from a directory.
  * A bare .oap/ folder (e.g. a future global ~/.oap/) does not count.
  * @param {string} start - starting directory
@@ -68,7 +98,7 @@ function readIndex(root) {
 function writeIndex(root, entries) {
   fs.mkdirSync(tasksDir(root), { recursive: true });
   const lines = entries.map((e) => `- ${e.id} · ${e.status} · ${e.title.replace(/[\r\n]+/g, ' ')}`);
-  fs.writeFileSync(path.join(tasksDir(root), 'index.md'), `${INDEX_HEADER}${lines.join('\n')}${lines.length ? '\n' : ''}`, 'utf8');
+  writeFileAtomic(path.join(tasksDir(root), 'index.md'), `${INDEX_HEADER}${lines.join('\n')}${lines.length ? '\n' : ''}`);
 }
 
 /**
@@ -84,8 +114,8 @@ function newTask(root, task) {
   for (let n = 2; fs.existsSync(path.join(tasksDir(root), id)); n++) id = `${base}-${n}`;
   const dir = path.join(tasksDir(root), id);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'task.md'), task.body || `# ${task.title}\n`, 'utf8');
-  fs.writeFileSync(path.join(dir, 'hallazgos.md'), FINDINGS_HEADER, 'utf8');
+  writeFileAtomic(path.join(dir, 'task.md'), task.body || `# ${task.title}\n`);
+  writeFileAtomic(path.join(dir, 'hallazgos.md'), FINDINGS_HEADER);
   writeIndex(root, [...readIndex(root), { id, status: 'in-progress', title: task.title }]);
   return { id, dir };
 }
@@ -132,7 +162,7 @@ function migrate(root) {
       if (fs.existsSync(path.join(dir, id))) continue;
       fs.mkdirSync(path.join(dir, id));
       fs.renameSync(path.join(dir, f), path.join(dir, id, 'task.md'));
-      fs.writeFileSync(path.join(dir, id, 'hallazgos.md'), FINDINGS_HEADER, 'utf8');
+      writeFileAtomic(path.join(dir, id, 'hallazgos.md'), FINDINGS_HEADER);
       if (!entries.some((e) => e.id === id)) entries.push({ id, status: 'migrated', title: taskTitle(path.join(dir, id, 'task.md')) || id.replace(/^\d{8}-/, '').replace(/-/g, ' ') });
       moved.push(id);
     }

@@ -1,6 +1,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { writeFileAtomic, readFileStable } = require('./fsatomic');
 
 // Per-repo files live under .oap/ (shared by all Odoo agent plugins). memory.md is shared; the rest is per plugin.
 // Older locations (.claude/odoosh-browser*.json, .claude/odoo-agent*.json) are still read until "config.js migrate".
@@ -82,7 +83,8 @@ function findConfigPath(startDir) {
 function loadConfig(startDir) {
   const configPath = findConfigPath(startDir);
   if (!configPath) return null;
-  const raw = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  const raw = readFileStable(configPath, JSON.parse);
+  if (raw === null) return null;
   const config = { ...DEFAULTS, ...raw, ssh: { ...DEFAULTS.ssh, ...(raw.ssh || {}) }, autonomy: { ...DEFAULTS.autonomy, ...(raw.autonomy || {}) } };
   const legacy = !configPath.endsWith(AGENT_FILES.config);
   const up = legacy ? 2 : 3;
@@ -118,8 +120,7 @@ function validateConfig(config) {
  * @param {object} config - config to write
  */
 function saveConfig(configPath, config) {
-  fs.mkdirSync(path.dirname(configPath), { recursive: true });
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+  writeFileAtomic(configPath, JSON.stringify(config, null, 2) + '\n');
 }
 
 /**
