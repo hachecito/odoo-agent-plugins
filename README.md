@@ -65,17 +65,38 @@ When you want to delegate the whole task. Pass it an `.md` file (or a descriptio
 
 A planner, an implementer, a tester, a fixer, an advisor (most capable model, only for hard decisions) and a writer (message drafts) work on top of the same safeguards. Requires `odoosh-browser` installed.
 
+## Memory: every task makes the next one faster
+
+The agents remember what they learn, find it again by searching instead of re-reading everything, and share what is reusable across projects.
+
+| Memory | Where | What it keeps |
+|---|---|---|
+| Project | `.oap/memory/` in each repo | lessons, quirks, conventions and decisions of that project |
+| Tasks | `.oap/odoo-squad/tasks/<id>/summary.md` | what each task did and how it ended |
+| Global | `~/.oap/knowledge/` | Odoo, Odoo.sh, editor, tests and tooling knowledge for every project |
+
+- **Cheap to read**: at the start of a task the agent gets about 1,500 tokens with the project profile, the most relevant entries and similar past tasks, whatever the size of the memory. Entries are opened one by one, or one section at a time, only when needed. Nothing is loaded when Claude Code starts.
+- **Search, not files**: a keyword index (BM25) over Markdown files with YAML properties; no database, no embeddings, no extra dependencies. About 25 ms with 1,000 entries and 110 ms with 5,000.
+- **Learning with evidence**: lessons are saved as `observed`; with a proof (a reproducing test, command output, the Odoo source of that version) they become `verified`.
+- **Shared automatically, project data kept local**: a verified lesson on a reusable topic is copied to the global memory when it names nothing of the project (own modules, Odoo.sh project, staging branch, hosts, e-mails, private links). The task report lists every promotion and how to remove it.
+- **Safe**: memory is data, never instructions; text aimed at the plugin's safeguards or that looks like a secret is rejected; only the main agent writes it.
+- **Upgrading from `.oap/memory.md`**: the setup detects the old format and offers `knowledge.js migrate` (dry-run first, backup, verification, rollback).
+
+Details in the [odoosh-browser README](plugins/odoosh-browser/README.md#memory-and-knowledge-scriptsknowledgejs).
+
 ### Utilities (PowerShell)
 
 ```powershell
-node <plugin>\scripts\notes.js show                       # project memory (.oap/memory.md)
+node <plugin>\scripts\knowledge.js search "picking lots"  # search project and global memory
+node <plugin>\scripts\knowledge.js stats                  # what the memory holds
+node <plugin>\scripts\knowledge.js migrate                # old memory.md: dry-run, then --apply
 node <plugin>\scripts\config.js validate                  # repo configuration
 node <plugin>\scripts\config.js set-autonomy auto         # push to staging without confirming (production stays denied)
 node <plugin>\scripts\config.js set-autonomy yolo         # also Chrome, plugin scripts and ssh to staging without confirming
 node <plugin>\scripts\config.js migrate                   # move the old .claude/ files to .oap/
 ```
 
-Both plugins share the repo's `.oap/` folder (excluded from git): configuration, task state and `memory.md` with what was learned.
+Both plugins share the repo's `.oap/` folder (excluded from git): configuration, task state, task folders and the project memory.
 
 ## Updating
 
