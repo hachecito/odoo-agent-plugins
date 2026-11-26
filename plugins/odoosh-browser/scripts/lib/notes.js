@@ -1,7 +1,8 @@
 'use strict';
 const fs = require('fs');
-const path = require('path');
 const { agentFile, legacyFile } = require('./config');
+const { writeFileAtomic, readFileStable, withLock } = require('./fsatomic');
+const { policyReason, secretReason } = require('./knowledge/validate');
 
 // memory.md is shared by every Odoo agent plugin: one short line per finding, "I thought X, actually Y".
 // Files written before the English migration have a Spanish header; it is not parsed, only rewritten on save.
@@ -16,23 +17,8 @@ const MAX_TEXT = 600;
 const MAX_NOTES = 100;
 const LINE_RE = /^- (?:\*\*(.+?)\*\* )?(.+?)(?: _\((\d{4}-\d{2}-\d{2})(?:, (.*))?\)_)?$/;
 
-// Memory is operational knowledge only: reject text that tries to widen permissions or switch safeguards off.
-const POLICY_PATTERNS = [
-  /\b(staging_branch|production_branches|allowed_domains|production_hosts)\b/i,
-  /\b(permiso|permisos|permission|permissions|permitid[oa]s?|autoriza\w*|authori[sz]\w*)\b/i,
-  /\b(hook|guard)\b/i,
-  /\b(ignora\w*|ignore|omit\w*|salta\w*|skip|bypass|desactiva\w*|disable)\b.{0,40}\b(instruccion\w*|instructions?|reglas?|rules?|confirmaci\w*|confirmation|seguridad|security|checks?|verificaci\w*)\b/i,
-  /\b(sin|without)\s+(pedir\s+)?(confirmaci\w*|confirmation)\b/i,
-];
-const SECRET_PATTERNS = [
-  /\b(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/,
-  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
-  /\b(password|passwd|contrase(ñ|n)a|token|api[_-]?key|secret)\s*[:=]\s*\S+/i,
-  /[A-Za-z0-9+=_-]{48,}/,
-];
-
 /**
- * Check whether a note text is acceptable.
+ * Check whether a note text is acceptable (policy and secret rules are shared with the knowledge store).
  * @param {string} text - note text
  * @returns {string|null} rejection reason, or null if valid
  */
@@ -40,11 +26,16 @@ function rejectReason(text) {
   if (!text || !text.trim()) return 'Empty note.';
   if (/[\r\n]/.test(text.trim())) return 'The note must be a single line.';
   if (text.length > MAX_TEXT) return `Note too long (max ${MAX_TEXT} characters): summarise it.`;
-  if (POLICY_PATTERNS.some((re) => re.test(text))) {
-    return 'Notes may only hold operational knowledge; no permissions, branch configuration or disabling safeguards.';
-  }
-  if (SECRET_PATTERNS.some((re) => re.test(text))) return 'The note looks like it contains a secret or credential.';
-  return null;
+  return policyReason(text) || secretReason(text);
+}
+
+/**
+ * Lock file guarding read-modify-write cycles on memory.md.
+ * @param {string} root - repo root
+ * @returns {string} lock path
+ */
+function memoryLock(root) {
+  return `${agentFile(root, 'memory')}.lock`;
 }
 
 /**
@@ -73,8 +64,8 @@ function serializeMemory(notes) {
  * @returns {{notes: Array<object>}} notes document
  */
 function loadNotes(root) {
-  const p = agentFile(root, 'memory');
-  return { notes: fs.existsSync(p) ? parseMemory(fs.readFileSync(p, 'utf8')) : [] };
+  const text = readFileStable(agentFile(root, 'memory'));
+  return { notes: text === null ? [] : parseMemory(text) };
 }
 
 /**
@@ -83,9 +74,7 @@ function loadNotes(root) {
  * @param {Array<object>} notes - notes
  */
 function saveNotes(root, notes) {
-  const p = agentFile(root, 'memory');
-  fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, serializeMemory(notes), 'utf8');
+  writeFileAtomic(agentFile(root, 'memory'), serializeMemory(notes));
 }
 
 /**
@@ -99,15 +88,17 @@ function addNote(root, note) {
   if (tag && !/^[\w.-]{1,24}$/.test(tag)) return { added: false, reason: 'Invalid tag (1-24 characters: letters, digits, . _ -).' };
   const reason = rejectReason(note.text);
   if (reason) return { added: false, reason };
-  const { notes } = loadNotes(root);
-  const text = note.text.trim();
-  if (notes.some((n) => n.text.toLowerCase() === text.toLowerCase())) return { added: false, reason: 'The note already exists.' };
-  if (notes.length >= MAX_NOTES) {
-    return { added: false, reason: `Memory full (${MAX_NOTES} notes): propose to the user merging or removing stale notes (notes.js remove <n>) before adding.` };
-  }
-  notes.push({ tag, text, at: new Date().toISOString().slice(0, 10), source: (note.source || '').replace(/[\r\n]+/g, ' ').trim() });
-  saveNotes(root, notes);
-  return { added: true };
+  return withLock(memoryLock(root), () => {
+    const { notes } = loadNotes(root);
+    const text = note.text.trim();
+    if (notes.some((n) => n.text.toLowerCase() === text.toLowerCase())) return { added: false, reason: 'The note already exists.' };
+    if (notes.length >= MAX_NOTES) {
+      return { added: false, reason: `Memory full (${MAX_NOTES} notes): propose to the user merging or removing stale notes (notes.js remove <n>) before adding.` };
+    }
+    notes.push({ tag, text, at: new Date().toISOString().slice(0, 10), source: (note.source || '').replace(/[\r\n]+/g, ' ').trim() });
+    saveNotes(root, notes);
+    return { added: true };
+  });
 }
 
 /**
@@ -117,11 +108,13 @@ function addNote(root, note) {
  * @returns {boolean} true if removed
  */
 function removeNote(root, index) {
-  const { notes } = loadNotes(root);
-  if (!Number.isInteger(index) || index < 1 || index > notes.length) return false;
-  notes.splice(index - 1, 1);
-  saveNotes(root, notes);
-  return true;
+  return withLock(memoryLock(root), () => {
+    const { notes } = loadNotes(root);
+    if (!Number.isInteger(index) || index < 1 || index > notes.length) return false;
+    notes.splice(index - 1, 1);
+    saveNotes(root, notes);
+    return true;
+  });
 }
 
 /**

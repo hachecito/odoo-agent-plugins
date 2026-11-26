@@ -1,7 +1,7 @@
 'use strict';
-const fs = require('fs');
 const { loadRun } = require('./run');
 const { agentFile } = require('./config');
+const { writeFileAtomic, readFileStable } = require('./fsatomic');
 
 // Only calls that poll the build status are spaced out; typing, clicks, waits and screenshots
 // (e.g. running tests in the editor terminal) are never delayed.
@@ -40,11 +40,10 @@ async function throttleBrowser(loaded, sleep, toolName) {
   const run = loadRun(loaded.root);
   if (!run || run.state !== 'REMOTE_BUILD') return 0;
   const p = agentFile(loaded.root, 'throttle');
-  const last = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')).last_ms : null;
+  const last = (readFileStable(p, JSON.parse) || {}).last_ms || null;
   const waitMs = computeWaitMs(last, Date.now(), loaded.config.build_poll_seconds);
   if (waitMs > 0) await sleep(waitMs);
-  fs.mkdirSync(require('path').dirname(p), { recursive: true });
-  fs.writeFileSync(p, JSON.stringify({ last_ms: Date.now() }) + '\n', 'utf8');
+  writeFileAtomic(p, JSON.stringify({ last_ms: Date.now() }) + '\n');
   return waitMs;
 }
 

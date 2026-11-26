@@ -1,7 +1,6 @@
 'use strict';
-const fs = require('fs');
-const path = require('path');
 const { agentFile } = require('./config');
+const { writeFileAtomic, readFileStable } = require('./fsatomic');
 
 const STATES = [
   'DISCOVERY', 'PLANNING', 'IMPLEMENTATION', 'LOCAL_TESTING', 'GIT_VALIDATION',
@@ -26,8 +25,7 @@ function runPath(root) {
  * @returns {object|null} state
  */
 function loadRun(root) {
-  const p = runPath(root);
-  return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null;
+  return readFileStable(runPath(root), JSON.parse);
 }
 
 /**
@@ -36,8 +34,7 @@ function loadRun(root) {
  * @param {object} run - state object
  */
 function saveRun(root, run) {
-  fs.mkdirSync(path.dirname(runPath(root)), { recursive: true });
-  fs.writeFileSync(runPath(root), JSON.stringify(run, null, 2) + '\n', 'utf8');
+  writeFileAtomic(runPath(root), JSON.stringify(run, null, 2) + '\n');
 }
 
 // States that close a run; a run idle for longer than RUN_STALE_HOURS is also considered closed.

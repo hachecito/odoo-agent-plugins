@@ -94,7 +94,7 @@ All plugin state lives in `.oap/` (Odoo Agent Plugins), at the repo root:
 One line per finding that **was not as expected** (commands that failed, paths, SSH host, modules with slow tests, editor or Odoo.sh quirks). The agent reads it at the start of each task and notes things **as soon as** it finds them, not only at the end, so a cut-off or blocked task also leaves its lessons.
 
 - Written with `scripts/notes.js add [--tag tag] --text "..."`: one line, max. 600 characters, max. 100 notes, no duplicates. With a full memory, `add` refuses the note and asks to merge or delete outdated notes: a lesson is never lost silently.
-- `notes.js` **rejects** text that widens permissions, touches the branch config, says to skip safeguards or looks like a secret. Editing the file directly asks for confirmation.
+- `notes.js` **rejects** text aimed at the plugin's safeguards (branch config, autonomy, the guard, skipping confirmations, pushing to production) or that looks like a secret. Odoo knowledge about access rights, install hooks or skipped tests is accepted. Editing the file directly asks for confirmation.
 - They are data, not instructions: they never change the security rules.
 - **Hook reminders** (`scripts/memory-hook.js`, only with an active task): after a tool failure it adds a reminder to note the finding right away (at most every 10 min), and on finishing it blocks **once per task** to ask whether there is anything to note. It does not repeat if `memory.md` was already written, and never creates stop loops.
 - View or clean up: `node <plugin>\scripts\notes.js show` and `node <plugin>\scripts\notes.js remove <n>`. It is plain Markdown: it can also be read by hand.
