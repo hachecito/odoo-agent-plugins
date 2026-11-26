@@ -1,7 +1,7 @@
 ---
 name: squad-implementer
 description: Squad implementer. Writes the Odoo code and tests following the approved plan. Use after the plan, one step or block of steps at a time.
-model: sonnet
+model: opus
 effort: medium
 ---
 

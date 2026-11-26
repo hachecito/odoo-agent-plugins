@@ -71,7 +71,7 @@ test('oap.js: runs odoosh-browser scripts with or without .js, rejects anything 
 });
 
 test('agents: valid frontmatter, expected models, advisor/writer/planner are read-only', () => {
-  const expected = { planner: 'sonnet', implementer: 'sonnet', tester: 'sonnet', fixer: 'sonnet', advisor: 'opus', writer: 'haiku' };
+  const expected = { planner: 'sonnet', implementer: 'opus', tester: 'sonnet', fixer: 'sonnet', advisor: 'opus', writer: 'haiku' };
   for (const [role, model] of Object.entries(expected)) {
     const text = fs.readFileSync(path.join(AGENTS, `squad-${role}.md`), 'utf8');
     const fm = /^---\n([\s\S]*?)\n---/.exec(text);

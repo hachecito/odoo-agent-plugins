@@ -20,7 +20,7 @@ In a modules repo where `/odoosh-browser:odoo-project-setup` has already been ru
 | Agent | Model | Role |
 |---|---|---|
 | `squad-planner` | sonnet | task questions before the plan; plan with acceptance criteria; revises it if the approach fails |
-| `squad-implementer` | sonnet | code and tests following the plan |
+| `squad-implementer` | opus | code and tests following the plan |
 | `squad-tester` | sonnet | local checks, test patch on the build and tests on Odoo.sh; returns evidence |
 | `squad-fixer` | sonnet | root cause, regression test that reproduces the failure and minimal fix |
 | `squad-advisor` | opus | consultation only: settles task questions, complex decisions, blockers, irreversible actions |
