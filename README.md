@@ -28,6 +28,7 @@ Claude Code plugins that take an Odoo task from start to finish: code and tests,
 - [Claude in Chrome](https://code.claude.com/docs/en/chrome) logged in to Odoo.sh, to read builds and logs and use the web editor.
 - `git` and, for pull requests, the `gh` CLI logged in.
 - SSH to Odoo.sh is optional and off by default.
+- Recommended: the [context7](https://claude.com/marketplace/plugins/context7) plugin, to look up Odoo documentation before reading Odoo's source. It is optional: without it the agents read the Odoo source of the project's version. Install it with `claude plugin install context7@claude-plugins-official`.
 
 ## Installation
 

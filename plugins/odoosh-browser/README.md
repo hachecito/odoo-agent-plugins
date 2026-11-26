@@ -10,8 +10,10 @@ It ships no browser extension or MCP of its own. It combines:
 | Build status | branch page on Odoo.sh (*HISTORY*) with Claude in Chrome, or SSH to the build. Optional: GitHub commit status with `gh` (see note) |
 | Logs, `odoo-update`, tests on the build | Odoo.sh web editor terminal, or SSH |
 | Logged-in Odoo.sh pages | [Claude in Chrome](https://code.claude.com/docs/en/chrome) |
-| Odoo questions | context7 + Odoo source code |
+| Odoo questions | context7 (recommended, optional) + Odoo source code |
 | Safeguards | deterministic `PreToolUse` hook (`scripts/guard.js`) |
+
+context7 is not a dependency: without it the skills go straight to the Odoo source of the project's version. To add it: `claude plugin install context7@claude-plugins-official`.
 
 ## Contents
 

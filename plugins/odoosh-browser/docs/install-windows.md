@@ -10,7 +10,7 @@
 | OpenSSH (included in Windows 10/11) | `ssh -V` |
 | Google Chrome or Edge with the **Claude in Chrome** extension 1.0.36+ | Chrome Web Store |
 | `github` MCP configured in Claude Code, or GitHub CLI (`gh`) | `/mcp` or `gh auth status` |
-| context7 (Odoo documentation) | `/mcp` |
+| context7 (Odoo documentation; recommended, optional): `claude plugin install context7@claude-plugins-official` | `/mcp` |
 
 ## 1. Install the plugin
 
