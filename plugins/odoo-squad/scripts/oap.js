@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 'use strict';
-// Runs a script of the odoosh-browser plugin (run-state.js, notes.js, config.js, report.js) from odoo-squad.
+// Runs a script of the odoosh-browser plugin (run-state.js, knowledge.js, notes.js, config.js, report.js) from odoo-squad.
 // Usage: node oap.js <script> [args...]   |   node oap.js --where
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-// odoo-squad relies on .oap/, autonomy (yolo) and the subagent rules of this odoosh-browser version.
-const MIN_VERSION = '0.12.0';
+// odoo-squad relies on .oap/, autonomy (yolo), the subagent rules and knowledge.js (context, task-summary) of this odoosh-browser version.
+const MIN_VERSION = '0.13.0';
 
 /**
  * Read the version of a plugin folder.

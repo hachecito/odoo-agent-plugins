@@ -11,7 +11,7 @@ Language: instructions are in English; reply to the user in the language they us
 
 - **Staging** builds are created from a neutralised copy of production and **do not run unit tests** automatically (only development builds do). A green staging build only proves it installs/updates.
 - The build has: `odoo-bin shell`, `odoo-update`, `odoosh-restart`, `psql`, `lnav ~/logs/odoo.log`. Logs in `~/logs/` (`odoo.log`, `install.log`, `update.log`, `pip.log`).
-- SSH: `ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new <build_id>@<build_domain>` (shortened to `ssh <build>` in this skill). Observed in two projects: the staging branch build id and host are **stable per branch** and reused across successive builds; to know which commit runs, use `git -C ~/src/user rev-parse HEAD`, never the build id. `accept-new` avoids the `Host key verification failed` of the first connection from a machine; it still rejects a changed key. Do not look for a new host: if the one in the notes does not answer, the problem is the network or the key (Channels).
+- SSH: `ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new <build_id>@<build_domain>` (shortened to `ssh <build>` in this skill). Observed in two projects: the staging branch build id and host are **stable per branch** and reused across successive builds; to know which commit runs, use `git -C ~/src/user rev-parse HEAD`, never the build id. `accept-new` avoids the `Host key verification failed` of the first connection from a machine; it still rejects a changed key. Do not look for a new host: if the one in the project memory (`knowledge.js search "ssh host"`) does not answer, the problem is the network or the key (Channels).
 - There is no documented public API for Odoo.sh builds: use SSH, the branch page in the browser or, optionally, the GitHub commit status with `gh`.
 
 For any doubt about commands, ORM or tests of the project's version, check **context7** (Odoo documentation) before assuming. If it does not cover it, check the Odoo source of that version and mark anything not checked as "unverified".
@@ -55,7 +55,7 @@ The configured GitHub MCP **does not expose** the commit status or check runs (c
    - **CONNECT** opens the staging instance for functional tests;
    - forbidden: Fork, Merge, Submodule, Delete, Allow my IP, Rebuild and the BACKUPS, UPGRADE, TOOLS and SETTINGS tabs.
    - The branch page URL is **[unverified]**: record it as a note the first time.
-2. To confirm the deployed commit: `git -C ~/src/user rev-parse HEAD` in the editor terminal (or over SSH if enabled and it answers on the first try; the host comes from the project notes, never look for another).
+2. To confirm the deployed commit: `git -C ~/src/user rev-parse HEAD` in the editor terminal (or over SSH if enabled and it answers on the first try; the host comes from the project memory, never look for another).
 3. `gh api repos/<owner>/<repo>/commits/<sha>/status`, only if `gh` is installed and authenticated.
 
 ## 1.1 Waiting for the build to finish

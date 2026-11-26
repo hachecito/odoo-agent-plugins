@@ -66,7 +66,7 @@ Subagents cannot commit or push: the guard denies it and only the orchestrator d
 
 ```
 .oap/
-  memory.md                         reusable lessons (shared with odoosh-browser)
+  memory/                           project memory (knowledge entries, shared with odoosh-browser)
   odoo-squad/tasks/
     index.md                        one line per task: id · status · title
     20261112-customer-reference/
@@ -74,10 +74,13 @@ Subagents cannot commit or push: the guard denies it and only the orchestrator d
       aclaraciones.md               questions settled before the plan and who decided them
       plan.md                       the planner's plan (and its revisions)
       hallazgos.md                  details that only apply to this task
+      summary.md                    what was done and the outcome (searchable)
+~/.oap/knowledge/                   global knowledge shared by every project
 ```
 
-- The planner always reads `memory.md` and the index, and only opens a previous task's folder if it is related.
-- The memory only keeps what helps in other tasks, tagged by topic.
+- The orchestrator runs `oap knowledge context` once and hands its output to the planner, which reads an entry's file only when the summary is not enough and cites the ids it relies on. Other agents get only the cited entries; a new failure gets one `oap knowledge search` with at most 3 results.
+- Agents return `[LESSON]` (with a suggested category and the proof they saw) and `[FINDING]`. Only the orchestrator records: lessons with `oap knowledge add`, proven ones as `verified`; findings in `hallazgos.md`; the task in `summary.md` with `oap knowledge task-summary`.
+- Verified lessons of a reusable topic that name nothing of the project are copied to global knowledge automatically; the final report lists them and how to remove each one. Details in the `odoosh-browser` README.
 - `scripts/tasks.js` creates the folders, maintains the index and migrates the 0.1.0 format (`tasks migrate`). Task statuses are `in-progress`, `completed`, `blocked`, `abandoned` and `migrated`; the Spanish ones from earlier versions are still accepted.
 - The `odoosh-browser` memory hook (reminder to note findings) also works during `squad-run`.
 

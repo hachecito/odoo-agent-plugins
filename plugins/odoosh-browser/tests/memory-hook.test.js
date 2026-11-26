@@ -63,3 +63,12 @@ test('failure hook: subagents are told to hand the lesson back, on their own int
   assert.ok(decide({ hook_event_name: 'PostToolUseFailure', cwd: root }, { ...deps, now: t + 1000 }).hookSpecificOutput.additionalContext.includes('notes.js'));
   fs.rmSync(root, { recursive: true, force: true });
 });
+
+test('stop hook: silent when an entry was added to the knowledge store during the run', () => {
+  const { root, deps } = fixture({ knowledge: [{ action: 'added', id: 'p-20261126-7f3a', title: 'x' }] });
+  assert.strictEqual(decide({ hook_event_name: 'Stop', cwd: root }, deps), null);
+  const other = fixture({ knowledge: [{ action: 'kept-in-project', id: 'p-20261126-7f3a', title: 'x' }] });
+  assert.strictEqual(decide({ hook_event_name: 'Stop', cwd: other.root }, other.deps).decision, 'block');
+  fs.rmSync(root, { recursive: true, force: true });
+  fs.rmSync(other.root, { recursive: true, force: true });
+});

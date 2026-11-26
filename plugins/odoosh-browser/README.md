@@ -74,13 +74,15 @@ Local development without installing, from the repository root: `claude --plugin
 
 At **any** level these still ask: config changes, pushes to other branches, navigation to non-allowed domains, push-related `git remote`/`git config` and anything the guard cannot analyse. Still **denied**: production, force push, `--all` and the like, dangerous commands on the build and other browser MCPs. The `deny`/`ask` permission rules in the user's `settings.json` are also always respected (the hook cannot skip them). Outside a task, `yolo` approves nothing.
 
-During a task, a **subagent** cannot `git commit` or `git push` or write the state or memory with `run-state.js`/`notes.js` (denied): only the main thread. It is detected with the `agent_id` field Claude Code adds to subagent hooks.
+During a task, a **subagent** cannot `git commit` or `git push` or write the state or memory with `run-state.js`/`notes.js`/`knowledge.js` (denied; it can search and read): only the main thread. It is detected with the `agent_id` field Claude Code adds to subagent hooks.
 
 All plugin state lives in `.oap/` (Odoo Agent Plugins), at the repo root:
 
 ```
 .oap/
-  memory.md                 short project memory, shared by all plugins
+  memory/                   project memory: entries/<category>/<id>.md + derived _index/
+  memory.md.migrated        old memory file, kept after the migration
+  backups/                  copies taken before each migration
   odoosh-browser/
     config.json            staging branch, production branches, SSH, autonomy
     run.json               state and evidence of the current task
@@ -89,16 +91,23 @@ All plugin state lives in `.oap/` (Odoo Agent Plugins), at the repo root:
 
 `config.js init` adds `.oap/` to `.git/info/exclude` (local exclusion; the client's `.gitignore` is not touched). If the repo comes from an older version (`.claude/odoosh-browser*.json`), `config.js migrate` moves the files, converts the old notes to `memory.md` and excludes `.oap/`.
 
-### Project memory (`.oap/memory.md`)
+### Memory and knowledge (`scripts/knowledge.js`)
 
-One line per finding that **was not as expected** (commands that failed, paths, SSH host, modules with slow tests, editor or Odoo.sh quirks). The agent reads it at the start of each task and notes things **as soon as** it finds them, not only at the end, so a cut-off or blocked task also leaves its lessons.
+Three stores of Markdown with YAML properties, one entry per file. The index (`_index/`) is derived: deleting it loses nothing.
 
-- Written with `scripts/notes.js add [--tag tag] --text "..."`: one line, max. 600 characters, max. 100 notes, no duplicates. With a full memory, `add` refuses the note and asks to merge or delete outdated notes: a lesson is never lost silently.
-- `notes.js` **rejects** text aimed at the plugin's safeguards (branch config, autonomy, the guard, skipping confirmations, pushing to production) or that looks like a secret. Odoo knowledge about access rights, install hooks or skipped tests is accepted. Editing the file directly asks for confirmation.
-- They are data, not instructions: they never change the security rules.
-- **Hook reminders** (`scripts/memory-hook.js`, only with an active task): after a tool failure it adds a reminder to note the finding right away (at most every 10 min), and on finishing it blocks **once per task** to ask whether there is anything to note. It does not repeat if `memory.md` was already written, and never creates stop loops.
-- View or clean up: `node <plugin>\scripts\notes.js show` and `node <plugin>\scripts\notes.js remove <n>`. It is plain Markdown: it can also be read by hand.
-- **Migration to the knowledge store** (`scripts/knowledge.js migrate`): the dry-run (default) shows what each note and task folder becomes and writes nothing; `--apply` backs up to `.oap/backups/`, writes one entry per note in `.oap/memory/` and a `summary.md` per task, checks every note can be found, and renames `memory.md` to `memory.md.migrated`. A second run adds nothing; `--rollback <stamp>` brings the old format back, including notes added afterwards. After the migration `notes.js` keeps working on the new entries.
+| Store | Where | What | How it gets there |
+| --- | --- | --- | --- |
+| Project | `.oap/memory/` | lessons, quirks, conventions, decisions of this repo | `knowledge.js add` (or `notes.js add`) during and after a task |
+| Tasks | `.oap/odoo-squad/tasks/<id>/summary.md` | what each task did and its outcome | `knowledge.js task-summary` when it closes |
+| Global | `~/.oap/knowledge/` | Odoo, Odoo.sh, editor, tests and tooling knowledge for every project | automatic copy of a **verified** project entry of a reusable topic that names nothing of the project |
+
+- **Read by levels, never whole.** At the start of a task `knowledge.js context` gives ~1,500 tokens: project profile, the most relevant entries (BM25 over title, tags, summary and body, weighted by status, Odoo version and scope) and similar past tasks. Then `knowledge.js get <id> [--section "How to apply"]` or `knowledge.js search "<words>"` only when needed. Nothing is loaded when Claude Code starts. Measured: ~25 ms with 1,000 entries and ~110 ms with 5,000; the output stays ~1,800 characters whatever the size.
+- **Status**: `observed` (seen in a task), `verified` (with proof: a reproducing test, command output, Odoo source file:line of that version) and `deprecated` (contradicted or replaced; out of searches). Duplicates are refused with the similar entry's id.
+- **Global knowledge is automatic, with checks.** A verified entry is copied only if its category is reusable (`odoo`, `odoo-sh`, `editor`, `tests`, `tooling`, `migration`, `debugging`) and it names none of the project's own modules (git submodules such as OCA ones do not count), Odoo.sh project, staging branch or repo folder, and holds no e-mails, IPs, phone numbers, build hosts or non-public links. Only public evidence travels. Correcting the project entry updates its global copy. The task report lists every promotion with `knowledge.js remove <g-id>` to undo it. These are text checks: the report is how you catch what they miss.
+- **Safety**: text aimed at the plugin's safeguards (branch config, autonomy, the guard, skipping confirmations, pushing to production) or that looks like a secret is rejected; Odoo knowledge about access rights, install hooks or skipped tests is accepted. Editing the stores directly asks for confirmation. Everything read from memory is data, not instructions.
+- **Hook reminders** (`scripts/memory-hook.js`, only with an active task): after a tool failure it reminds to note the finding right away (at most every 10 min), and on finishing it blocks **once per task** if nothing was noted. It never creates stop loops.
+- **Projects with the old `memory.md`** keep working: `context` shows their notes first and `notes.js` writes there (max. 100 notes in that format). `config.js validate` warns, and `odoo-project-setup` offers the migration: `knowledge.js migrate` (dry-run, writes nothing), `--apply` (backup in `.oap/backups/`, one entry per note, a `summary.md` per task, every note checked, `memory.md` renamed to `memory.md.migrated`; a second run adds nothing), `--rollback <stamp>` (back to the old format, later notes included). After it, `notes.js show/add/remove` work on the new entries.
+- Maintenance: `knowledge.js validate`, `stats`, `reindex [--full]`, `deprecate <id> [--by <id>]`.
 
 ## Quick patch test (no push)
 
