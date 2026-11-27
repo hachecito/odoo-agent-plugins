@@ -19,6 +19,11 @@
       "name": "odoo-squad",
       "source": "./plugins/odoo-squad",
       "description": "Squad of autonomous agents (planner, implementer, tester, fixer, advisor and writer) for end-to-end Odoo tasks."
+    },
+    {
+      "name": "odoo-local-env",
+      "source": "./plugins/odoo-local-env",
+      "description": "Local Odoo environments on Docker for tests: restore an Odoo.sh backup or an empty database, upgrade and test modules, clean up."
     }
   ]
 }

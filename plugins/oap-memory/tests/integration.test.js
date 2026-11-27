@@ -106,8 +106,11 @@ test('shared files are identical in every plugin that carries a copy', () => {
 
 test('mem.js finds oap-memory next to it, forwards commands and says so when it is missing', () => {
   const mem = path.join(PLUGINS, 'odoosh-browser', 'scripts', 'mem.js');
-  const where = spawnSync(process.execPath, [mem, '--where'], { encoding: 'utf8' });
+  // Isolated from a real marketplace install of oap-memory on this machine (it would win over the sibling).
+  const noInstall = tmp();
+  const where = spawnSync(process.execPath, [mem, '--where'], { encoding: 'utf8', env: { ...process.env, CLAUDE_CONFIG_DIR: noInstall, OAP_MEMORY: '' } });
   assert.strictEqual(path.resolve(where.stdout.trim()), path.join(PLUGINS, 'oap-memory', 'scripts'));
+  fs.rmSync(noInstall, { recursive: true, force: true });
   assert.match(spawnSync(process.execPath, [mem, '--help'], { encoding: 'utf8' }).stdout, /Usage: knowledge\.js/);
   // A copy of the launcher in a plugin with no oap-memory next to it and no install: exit 3 with the install command.
   const base = tmp();

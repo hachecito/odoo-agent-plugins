@@ -1,0 +1,10 @@
+{
+  "name": "odoo-local-env",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Claude Code plugin scripts (no runtime dependencies).",
+  "scripts": {
+    "test": "node --test tests/env.test.js"
+  },
+  "engines": { "node": ">=18" }
+}
