@@ -1,6 +1,6 @@
 {
   "name": "odoo-local-env",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local Odoo environments on Docker for tests: restore an Odoo.sh backup or create an empty database, upgrade and test modules, keep or clean up environments.",
   "author": {
     "name": "hachecito"

@@ -98,3 +98,40 @@ test('CLI: help, keep/release and down refuse without --yes, unknown environment
   assert.doesNotMatch(cli('status', '--name', 'a1').stdout, /"db_password"/);
   fs.rmSync(home, { recursive: true, force: true });
 });
+
+test('reset refuses an environment without snapshot (before touching Docker)', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'oaple-home-'));
+  const dir = path.join(home, '.oap', 'local-env', 'envs', 'b1');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'env.json'), JSON.stringify({ name: 'b1', version: '19.0', keep: true, port: 8069, db: 'b1' }));
+  const r = spawnSync(process.execPath, [CLI, 'reset', '--name', 'b1'], { encoding: 'utf8', env: { ...process.env, OAP_HOME: home } });
+  assert.strictEqual(r.status, 1);
+  assert.match(r.stderr, /has no snapshot/);
+  fs.rmSync(home, { recursive: true, force: true });
+});
+
+test('fromOdoosh: only pg_dump and tar run on the build, version mismatch refused, files downloaded', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'oaple-home-'));
+  const fake = path.join(home, 'fake-ssh.js');
+  const log = path.join(home, 'ssh.log');
+  // Fake ssh: logs the remote command and answers like the build would.
+  fs.writeFileSync(fake, `const fs=require('fs');const cmd=process.argv[process.argv.length-1];fs.appendFileSync(${JSON.stringify(log)},cmd+String.fromCharCode(10));
+if(cmd.includes('latest_version'))process.stdout.write(process.env.FAKE_VERSION);
+else if(cmd.includes('pg_dump'))process.stdout.write('PGDMP');else if(cmd.includes('tar -cf'))process.stdout.write('TAR');`);
+  const run = (version, target = '123@proj-staging-123.dev.odoo.com') => spawnSync(process.execPath, ['-e',
+    `require(${JSON.stringify(CLI)}).fromOdoosh(${JSON.stringify(target)}, 'c1', '19.0'); console.log('OK')`],
+  { encoding: 'utf8', env: { ...process.env, OAP_HOME: home, OAP_LOCALENV_SSH: fake, FAKE_VERSION: version } });
+  assert.match(run('19.0', 'bad target; rm -rf /').stderr, /expects the SSH target/);
+  const old = run('16.0.1.3');
+  assert.strictEqual(old.status, 1);
+  assert.match(old.stderr, /runs Odoo 16.0.1.3 but the environment is 19.0/);
+  const ok = run('19.0.1.3');
+  assert.match(ok.stdout, /OK/, ok.stderr);
+  const out = path.join(home, '.oap', 'local-env', 'downloads', 'c1');
+  assert.strictEqual(fs.readFileSync(path.join(out, 'dump.dump'), 'utf8'), 'PGDMP');
+  assert.strictEqual(fs.readFileSync(path.join(out, 'filestore.tar'), 'utf8'), 'TAR');
+  for (const cmd of fs.readFileSync(log, 'utf8').trim().split('\n')) {
+    assert.match(cmd, /^DB=\$\(psql -tAc "select current_database\(\)"\); (psql -tAc "select latest_version|pg_dump -Fc|cd "\$HOME\/data\/filestore\/\$DB" && tar -cf - \.)/, cmd);
+  }
+  fs.rmSync(home, { recursive: true, force: true });
+});

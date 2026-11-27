@@ -12,7 +12,9 @@ const USAGE = `Usage: localenv.js <command> [options]
   enterprise --version 19.0 [--path dir]   clone odoo/enterprise once per version (or register an existing folder)
   addons --repo dir                        show the addons folders found in a repo
   up --name n --repo dir --version 19.0 [--backup file.zip|.dump|.sql] [--modules a,b] [--port 8069]
-     [--enterprise dir|none] [--extra-addons d1,d2] [--pip pkg1,pkg2] [--pg 16] [--no-neutralize]
+     [--enterprise dir|none] [--extra-addons d1,d2] [--pip pkg1,pkg2] [--pg 16] [--no-neutralize] [--no-snapshot]
+  up ... --from-odoosh <build>@<host>      take database and filestore from an Odoo.sh build over SSH (instead of --backup)
+  snapshot --name n | reset --name n       save the current database as the reset point / go back to it (taken after a restore)
   list | status --name n | start --name n | stop --name n | logs --name n [--tail 200]
   restart --name n                         restart Odoo (reload Python code changes)
   rebuild --name n [--repo dir] [--pip p] re-detect addons and requirements (or point to another repo folder), keep the data
@@ -282,7 +284,12 @@ async function up(o) {
     ent = enterpriseFor(version);
     if (!ent) die(`No Enterprise ${version} yet: run "enterprise --version ${version}" first, or pass --enterprise none for Community.`);
   }
-  const backup = o.backup && o.backup !== true ? path.resolve(o.backup) : null;
+  let backup = o.backup && o.backup !== true ? path.resolve(o.backup) : null;
+  let filestoreTar = null;
+  if (o['from-odoosh'] && o['from-odoosh'] !== true) {
+    if (backup) die('Use --backup or --from-odoosh, not both.');
+    ({ dump: backup, filestore: filestoreTar } = fromOdoosh(String(o['from-odoosh']), name, version));
+  }
   if (backup && !fs.existsSync(backup)) die(`Backup not found: ${backup}`);
   let pg = o.pg && o.pg !== true ? String(o.pg) : E.DEFAULT_PG;
   if (!o.pg && backup && backup.endsWith('.zip')) {
@@ -320,9 +327,11 @@ async function up(o) {
   if (backup) {
     const script = path.join(__dirname, 'lib', 'restore.py');
     const mounts = ['-v', `${E.hostPath(path.dirname(backup))}:/backup:ro`, '-v', `${E.hostPath(script)}:/oap/restore.py:ro`];
-    const status = odooRun(e, ['python3', '/oap/restore.py', '--src', `/backup/${path.basename(backup)}`, '--db', e.db, '--filestore', '/var/lib/odoo/filestore'], [...pgEnv, ...mounts]);
+    const tarArgs = filestoreTar ? ['--filestore-tar', `/backup/${path.basename(filestoreTar)}`] : [];
+    const status = odooRun(e, ['python3', '/oap/restore.py', '--src', `/backup/${path.basename(backup)}`, '--db', e.db, '--filestore', '/var/lib/odoo/filestore', ...tarArgs], [...pgEnv, ...mounts]);
     if (status !== 0) die(`Restore failed. The environment is left as is: inspect it, or "down --name ${name} --yes" and retry.`);
     if (!o['no-neutralize']) neutralize(e);
+    if (!o['no-snapshot']) snapshot(e);
   } else {
     const mods = ['base', ...(o.modules && o.modules !== true ? String(o.modules).split(',') : [])].join(',');
     const demo = Number(version.split('.')[0]) < 19 ? ['--without-demo=all'] : [];
@@ -332,6 +341,81 @@ async function up(o) {
     if (odooRun(e, ['odoo', '-d', e.db, '-u', String(o.modules), '--stop-after-init']) !== 0) die('Module update failed (see the log above).');
   }
   await startOdoo(e);
+}
+
+/**
+ * Shell command run in the odoo service with Postgres access (data volume mounted).
+ * @param {object} e - record
+ * @param {string} script - sh script
+ * @returns {number} exit status
+ */
+function dbShell(e, script) {
+  return odooRun(e, ['sh', '-ec', script], ['-e', 'PGHOST=db', '-e', 'PGUSER=odoo', '-e', `PGPASSWORD=${e.db_password}`]);
+}
+
+/**
+ * Save the current database and filestore as the environment's snapshot (template copy), replacing the previous one.
+ * @param {object} e - record
+ */
+function snapshot(e) {
+  const fsDir = '/var/lib/odoo/filestore';
+  const snap = `${e.db}_snap`;
+  console.log(`>> snapshot: ${e.db} -> ${snap} (reset restores it in seconds; it takes as much disk as the database)`);
+  compose(e, ['stop', 'odoo']);
+  const ok = dbShell(e, `dropdb --if-exists ${snap}; createdb -T ${e.db} ${snap}; rm -rf ${fsDir}/${snap}; if [ -d ${fsDir}/${e.db} ]; then cp -a ${fsDir}/${e.db} ${fsDir}/${snap}; fi`);
+  if (ok !== 0) die('Snapshot failed (see above).');
+  e.snapshot_at = new Date().toISOString();
+  saveEnv(e);
+}
+
+/**
+ * Put the database and filestore back to the snapshot.
+ * @param {object} e - record
+ */
+async function reset(e) {
+  if (!e.snapshot_at) die(`${e.name} has no snapshot: take one with "snapshot --name ${e.name}" first.`);
+  const fsDir = '/var/lib/odoo/filestore';
+  const snap = `${e.db}_snap`;
+  requireDocker();
+  console.log(`>> reset ${e.db} to the snapshot of ${e.snapshot_at}`);
+  compose(e, ['stop', 'odoo']);
+  const ok = dbShell(e, `dropdb --if-exists ${e.db}; createdb -T ${snap} ${e.db}; rm -rf ${fsDir}/${e.db}; if [ -d ${fsDir}/${snap} ]; then cp -a ${fsDir}/${snap} ${fsDir}/${e.db}; fi`);
+  if (ok !== 0) die('Reset failed (see above).');
+  await startOdoo(e);
+}
+
+/**
+ * Download the database (pg_dump custom format) and filestore of an Odoo.sh build over SSH into
+ * ~/.oap/local-env/downloads/<name>/. Read-only on the build: only psql queries, pg_dump and tar run there.
+ * @param {string} target - ssh target as shown by Odoo.sh (e.g. 1234567@project-branch-1234567.dev.odoo.com)
+ * @param {string} name - environment name
+ * @param {string} version - expected Odoo version
+ * @returns {{dump: string, filestore: string}} downloaded files
+ */
+function fromOdoosh(target, name, version) {
+  if (!/^[\w.-]+@[\w.-]+$/.test(target)) die('--from-odoosh expects the SSH target of the build: <build id>@<build host>.');
+  // OAP_LOCALENV_SSH replaces ssh in tests (a .js file runs with node).
+  const fake = process.env.OAP_LOCALENV_SSH;
+  const ssh = fake ? (fake.endsWith('.js') ? process.execPath : fake) : 'ssh';
+  const sshArgs = (cmd) => [...(fake && fake.endsWith('.js') ? [fake] : []), '-o', 'BatchMode=yes', target, cmd];
+  const dbq = 'DB=$(psql -tAc "select current_database()")';
+  const v = capture(ssh, sshArgs(`${dbq}; psql -tAc "select latest_version from ir_module_module where name='base'"`));
+  if (v.status !== 0) die(`SSH to ${target} failed: ${v.err || v.out}. Check the user's SSH key is registered in Odoo.sh.`);
+  const remote = E.normVersion(v.out.split('.')[0]);
+  if (remote !== version) die(`The build runs Odoo ${v.out} but the environment is ${version}. Bring a build of the same version (or a migrated backup with --backup).`);
+  const out = path.join(BASE, 'downloads', name);
+  fs.mkdirSync(out, { recursive: true });
+  const fetchTo = (file, cmd, label) => {
+    console.log(`>> downloading ${label} from ${target}`);
+    const fd = fs.openSync(path.join(out, file), 'w');
+    const r = spawnSync(ssh, sshArgs(cmd), { stdio: ['ignore', fd, 'inherit'] });
+    fs.closeSync(fd);
+    if (r.error || r.status !== 0) die(`Download of ${label} failed (exit ${r.status}).`);
+    return path.join(out, file);
+  };
+  const dump = fetchTo('dump.dump', `${dbq}; pg_dump -Fc --no-owner --no-privileges "$DB"`, 'the database (pg_dump)');
+  const filestore = fetchTo('filestore.tar', `${dbq}; cd "$HOME/data/filestore/$DB" && tar -cf - .`, 'the filestore');
+  return { dump, filestore };
 }
 
 /**
@@ -445,6 +529,8 @@ function list() {
 function removeEnv(e) {
   compose(e, ['down', '--volumes', '--remove-orphans', ...(e.build ? ['--rmi', 'local'] : [])]);
   fs.rmSync(envDir(e.name), { recursive: true, force: true });
+  // Files downloaded from Odoo.sh for this environment (dump and filestore tar).
+  fs.rmSync(path.join(BASE, 'downloads', e.name), { recursive: true, force: true });
   console.log(`>> ${e.name} deleted.`);
 }
 
@@ -512,6 +598,14 @@ async function main() {
       requireDocker();
       compose(loadEnv(o.name), ['restart', 'odoo']);
       return startOdoo(loadEnv(o.name));
+    case 'snapshot': {
+      requireDocker();
+      const e = loadEnv(o.name);
+      snapshot(e);
+      return startOdoo(e);
+    }
+    case 'reset':
+      return reset(loadEnv(o.name));
     case 'update':
       return updateModules(loadEnv(o.name), '-u', o.modules);
     case 'install':
@@ -546,4 +640,6 @@ async function main() {
   return undefined;
 }
 
-main().catch((err) => die(String((err && err.stack) || err)));
+if (require.main === module) main().catch((err) => die(String((err && err.stack) || err)));
+
+module.exports = { fromOdoosh };

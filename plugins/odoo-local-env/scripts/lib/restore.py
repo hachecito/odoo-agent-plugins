@@ -1,13 +1,14 @@
 """Restore an Odoo backup into the environment's Postgres and filestore. Runs inside the Odoo container.
 
 Accepts an Odoo.sh / database manager .zip (dump.sql or dump.dump plus filestore/), a pg_dump custom file (.dump)
-or a plain .sql. The dump is streamed (never extracted to disk). Usage:
+or a plain .sql (optionally with --filestore-tar). The dump is streamed (never extracted to disk). Usage:
 restore.py --src /backup/<file> --db <name> --filestore /var/lib/odoo/filestore
 """
 import argparse
 import os
 import shutil
 import subprocess
+import tarfile
 import tempfile
 import sys
 import zipfile
@@ -48,6 +49,7 @@ def main():
     p.add_argument("--src", required=True)
     p.add_argument("--db", required=True)
     p.add_argument("--filestore", required=True)
+    p.add_argument("--filestore-tar", help="tar of the filestore folder (from Odoo.sh over SSH)")
     a = p.parse_args()
     subprocess.check_call(["createdb", "-T", "template0", "-E", "UTF8", a.db])
     print(">> database %s created" % a.db, flush=True)
@@ -72,7 +74,16 @@ def main():
         print(">> loading %s (this can take several minutes)" % os.path.basename(a.src), flush=True)
         with open(a.src, "rb") as s:
             load(a.db, a.src, s)
-        print(">> no filestore in a bare dump: attachments will be missing", flush=True)
+        if a.filestore_tar:
+            target = os.path.join(a.filestore, a.db)
+            os.makedirs(target, exist_ok=True)
+            with tarfile.open(a.filestore_tar) as t:
+                members = [m for m in t.getmembers() if m.isfile() or m.isdir()]
+                print(">> copying filestore: %d entries" % len(members), flush=True)
+                # 'data' filter (no absolute paths, links out of the target) where this Python supports it.
+                t.extractall(target, members=members, **({"filter": "data"} if hasattr(tarfile, "data_filter") else {}))
+        else:
+            print(">> no filestore in a bare dump: attachments will be missing", flush=True)
     print(">> restore done", flush=True)
 
 

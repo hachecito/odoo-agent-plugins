@@ -19,13 +19,15 @@ Below `le` means `node "${CLAUDE_PLUGIN_ROOT}/scripts/localenv.js"`. Everything 
 
 ## Mount an environment
 
-1. **Ask** (AskUserQuestion; never infer): the repo (path or GitHub branch), the Odoo version, and the database: a backup path (Odoo.sh `.zip` with `dump.sql` + `filestore/`, a `.dump` or a `.sql`) or none (empty database). Propose a name like `<project>-<task>`.
+1. **Ask** (AskUserQuestion; never infer): the repo (path or GitHub branch), the Odoo version, and the database: a backup path (Odoo.sh `.zip` with `dump.sql` + `filestore/`, a `.dump` or a `.sql`), an Odoo.sh build to copy over SSH, or none (empty database). Propose a name like `<project>-<task>`.
 2. **Code**: the repo path must have its submodules checked out (`git submodule update --init`). Check what will be loaded: `le addons --repo <dir>`.
 3. **Enterprise** (skip for Community with `--enterprise none`):
    - `le enterprise --version <v>` clones `odoo/enterprise` once per version with the user's own GitHub access; if there is no access it says so.
    - If the user already has an Enterprise folder for that version: `le enterprise --version <v> --path <dir>`.
 4. **Up**: `le up --name <n> --repo <dir> --version <v> [--backup <file>] [--modules a,b]`.
    - With a backup: restores dump and filestore, neutralizes, then (if `--modules`) upgrades them.
+   - With `--from-odoosh <build id>@<build host>` instead of `--backup`: downloads the database (`pg_dump`) and the filestore of that build over SSH into `~/.oap/local-env/downloads/<name>/`, then restores like a backup. Only for **staging or development builds, never production**, and only with the user's OK; the user copies the SSH target from the build's SSH/Shell tab in Odoo.sh and their SSH key must be registered there. The build must run the same Odoo version (it refuses otherwise; for a migration use the migrated backup). On the build only `psql` queries, `pg_dump` and `tar` run. The filestore path (`~/data/filestore/<db>`) has not been verified on a real build yet: if the tar step fails, tell the user.
+   - After a restore it takes a **snapshot** (copy of database and filestore) so `reset` can go back in seconds; `--no-snapshot` skips it when disk is short.
    - Without a backup: creates an empty database with `base` plus `--modules`.
    - The repo's `requirements.txt` files (root, submodules, modules) are installed in a project image built on the official `odoo:<v>` image.
    - It prints the URL (`http://localhost:<port>`). The admin user's password is the one of the restored database; for an empty database it is `admin`.
@@ -39,6 +41,8 @@ Below `le` means `node "${CLAUDE_PLUGIN_ROOT}/scripts/localenv.js"`. Everything 
 - If Odoo answers HTTP 500, read the ERROR/CRITICAL lines of the log and tell the user: they are usually project errors (a module or a view of the database), not environment errors.
 - `le update --name <n> --modules a,b` (`-u`) / `le install --name <n> --modules a,b` (`-i`): stops the server, runs the update, restarts.
 - `le test --name <n> --modules a,b [--tags ...]`: runs the module tests (default tags `/module`) and returns the exit code; quote the failing tests from the output.
+- `le reset --name <n>`: back to the snapshot (discards everything done since). `le snapshot --name <n>`: make the current state the new reset point (asks nothing, replaces the previous one: tell the user).
+- **Migrated databases** often fail to render (HTTP 500) because of views or website editor customizations (`ir_asset` with `/_custom/` paths) saved in the database that no longer fit the new version. List the failing ones from the log and, with the user's OK, deactivate them in the local copy only (`UPDATE ir_ui_view SET active = false WHERE id = ...`, then `le restart`). Report what was deactivated: they are migration issues to fix in the project.
 - `le logs --name <n> [--tail 500]`, `le stop|start --name <n>` (stop frees RAM and keeps everything).
 
 ## Clean up
