@@ -22,6 +22,7 @@ Claude Code plugins that take an Odoo task from start to finish: code and tests,
 | [odoosh-browser](plugins/odoosh-browser/README.md) | End-to-end Odoo tasks on an Odoo.sh staging branch: code and tests, commit, push with confirmation, build, logs and tests verification (Odoo.sh web editor with Claude in Chrome, or SSH) and a report with evidence. |
 | [odoo-squad](plugins/odoo-squad/README.md) | Squad of autonomous agents that runs a documented task end to end: plans, implements, tests, fixes, consults an advisor and writes the report. Requires `odoosh-browser`. |
 | [oap-memory](plugins/oap-memory/README.md) | Shared memory of the other plugins: project memory, task summaries and global knowledge with indexed search, automatic promotion and safeguards. Installed automatically as a dependency. |
+| [odoo-local-env](plugins/odoo-local-env/README.md) | Local Odoo environments on Docker for tests: restores an Odoo.sh backup or creates an empty database, with the repo's modules and Enterprise; upgrades and tests modules; keeps or cleans up environments. Independent: the other plugins do not use it. |
 
 ## Requirements
 
@@ -67,6 +68,14 @@ When you want to delegate the whole task. Pass it an `.md` file (or a descriptio
 
 A planner, an implementer, a tester, a fixer, an advisor (most capable model, only for hard decisions) and a writer (message drafts) work on top of the same safeguards. Requires `odoosh-browser` installed.
 
+### odoo-local-env: a local Odoo on Docker
+
+Only when you ask for it. Needs Docker (Docker Desktop on Windows/macOS) running:
+
+```
+/odoo-local-env:local-env mount a local environment of this repo, Odoo 19, with the backup C:ackupsclient.zip
+```
+
 ## Memory: every task makes the next one faster
 
 The agents remember what they learn, find it again by searching instead of re-reading everything, and share what is reusable across projects.
@@ -108,6 +117,7 @@ claude plugin marketplace update odoo-agent-plugins
 claude plugin update odoosh-browser@odoo-agent-plugins     # check claude plugin list --> new version
 claude plugin update odoo-squad@odoo-agent-plugins
 claude plugin update oap-memory@odoo-agent-plugins         # installed on its own the first time, as a dependency
+claude plugin update odoo-local-env@odoo-agent-plugins     # only if you installed it
 ```
 
 ## Structure
