@@ -73,7 +73,7 @@ A planner, an implementer, a tester, a fixer, an advisor (most capable model, on
 Only when you ask for it. Needs Docker (Docker Desktop on Windows/macOS) running:
 
 ```
-/odoo-local-env:local-env mount a local environment of this repo, Odoo 19, with the backup C:ackupsclient.zip
+/odoo-local-env:local-env mount a local environment of this repo, Odoo 19, with the backup <path/to/backup.zip>
 ```
 
 ## Memory: every task makes the next one faster

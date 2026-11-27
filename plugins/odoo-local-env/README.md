@@ -3,7 +3,7 @@
 Local Odoo environments on Docker, for tests. Independent: the other plugins of this marketplace do not use it, and it only runs when you ask for it.
 
 ```
-/odoo-local-env:local-env mount a local environment of this repo, Odoo 19, with the backup C:\backups\client.zip
+/odoo-local-env:local-env mount a local environment of this repo, Odoo 19, with the backup <path/to/backup.zip>
 ```
 
 ## What it does

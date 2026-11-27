@@ -67,7 +67,7 @@ Give the user a disposable local copy of an Odoo project (code from the repo, da
 
 ## Examples
 
-- "Monta un entorno local de este repo en 19 con C:\backups\client.zip": `le up --name client-task --repo . --version 19.0 --backup C:\backups\client.zip`.
+- "Monta un entorno local de este repo en 19 con <path/to/backup.zip>": `le up --name client-task --repo . --version 19.0 --backup <path/to/backup.zip>` (pass the path exactly as the user gives it; Windows, macOS and Linux paths all work).
 - "Prueba mi cambio en sale_custom": `le update --name client-task --modules sale_custom`, then `le test --name client-task --modules sale_custom`.
 - "Vuelve a los datos originales": `le reset --name client-task`.
 - "Ya no trabajo con 16": `le clean --version 16.0`, show the list, then `--yes` after the user's OK.
