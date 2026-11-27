@@ -6,6 +6,11 @@
   "description": "Claude Code tools for Odoo and Odoo.sh development.",
   "plugins": [
     {
+      "name": "oap-memory",
+      "source": "./plugins/oap-memory",
+      "description": "Shared memory for the other plugins: project memory, task summaries and global knowledge with indexed search and safeguards."
+    },
+    {
       "name": "odoosh-browser",
       "source": "./plugins/odoosh-browser",
       "description": "Agent for end-to-end Odoo tasks on Odoo.sh staging branches."

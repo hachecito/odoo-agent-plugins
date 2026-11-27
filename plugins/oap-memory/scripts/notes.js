@@ -5,8 +5,8 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { loadConfig } = require('./lib/config');
-const { loadNotes, addNote, removeNote, renderNotes } = require('./lib/notes');
+const { findRoot, ensureExcluded } = require('./lib/root');
+const { loadNotes, addNote, removeNote, renderNotes, migrateLegacyNotes } = require('./lib/notes');
 
 /**
  * Read the value following a --flag.
@@ -53,15 +53,16 @@ function knowledge(root, args) {
   process.exit(res.status === null ? 1 : res.status);
 }
 
-/** Entry point: show [--tag t] | add [--tag t] --text x [--source x] | remove <n>. */
+/** Entry point: show [--tag t] | add [--tag t] --text x [--source x] | remove <n> | migrate-legacy. */
 function main() {
   const [cmd, ...args] = process.argv.slice(2);
-  const loaded = loadConfig(opt(args, 'dir') || process.cwd());
-  if (!loaded) {
-    console.error('No .oap/odoosh-browser/config.json: run the odoo-project-setup skill first.');
-    process.exit(1);
+  const { root } = findRoot(opt(args, 'dir') || process.cwd());
+  if (['add', 'remove', 'migrate-legacy'].includes(cmd)) ensureExcluded(root);
+  if (cmd === 'migrate-legacy') {
+    // Old .claude/*-notes.json (odoosh-browser <= 0.3) into .oap/memory.md; used by "config.js migrate".
+    console.log(`Legacy notes converted: ${migrateLegacyNotes(root)}`);
+    return;
   }
-  const root = loaded.root;
   if (migrated(root)) {
     const { cut, categoryFor } = require('./lib/knowledge/migrate');
     if (cmd === 'show') {

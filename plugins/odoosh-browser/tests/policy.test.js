@@ -220,7 +220,8 @@ test('redirections are not refspecs nor writes: 2>&1 push to staging, reading co
   assert.strictEqual(bash('echo {} > .oap/odoosh-browser/config.json'), 'ask');
   assert.strictEqual(bash('cp other.json .oap/odoosh-browser/config.json'), 'ask');
   assert.strictEqual(bash('sed -n 1,20p .oap/memory.md'), null);
-  assert.strictEqual(bash('sed -i s/a/b/ .oap/memory.md'), 'ask');
+  // The memory files are oap-memory's (mem-guard asks there; see the combined test below).
+  assert.strictEqual(bash('sed -i s/a/b/ .oap/memory.md'), null);
 });
 
 const OWN_SCRIPTS = path.join(__dirname, '..', 'scripts').split(path.sep).join('/');
@@ -283,12 +284,11 @@ test('subagents cannot commit or push during a task', () => {
   assert.strictEqual(decideYolo('Bash', { command: 'git commit -m x' }), null);
 });
 
-test('subagents cannot write run state or memory during a task', () => {
+test('subagents cannot write run state during a task', () => {
   const sub = (command, opts = {}) => decideYolo('Bash', { command }, { agentId: 'a1', ...opts });
   assert.strictEqual(sub('node "C:/p/scripts/run-state.js" evidence --kind remote_tests --status pass --detail x'), 'deny');
   assert.strictEqual(sub('node "C:/p/scripts/oap.js" run-state.js state REMOTE_TESTING'), 'deny');
   assert.strictEqual(sub('node "C:/p/scripts/oap.js" run-state close'), 'deny');
-  assert.strictEqual(sub('node "C:/p/scripts/oap.js" notes.js add --text x'), 'deny');
   assert.strictEqual(sub('node "C:/p/scripts/run-state.js" show'), null);
   assert.strictEqual(sub('node "C:/p/scripts/oap.js" notes show'), null);
   assert.strictEqual(sub('node "C:/p/scripts/run-state.js" evidence --kind x', { active: false }), null);
@@ -337,33 +337,28 @@ test('odoo-bin shell: diag.js commands pass the guard, nested browser_batch text
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('knowledge stores: direct edits ask, reads are free, remove and migrate ask even in yolo', () => {
-  const sh = (command, opts) => decideYolo('Bash', { command }, opts);
-  for (const f of ['C:\\repo\\.oap\\memory\\entries\\tests\\p-20261126-7f3a.md', '/home/u/.oap/knowledge/entries/odoo/g-20261126-aa10.md', 'C:/repo/.oap/memory/_index/catalog.jsonl']) {
-    assert.strictEqual(decide('Write', { file_path: f }), 'ask', f);
-    assert.strictEqual(decide('Edit', { file_path: f }), 'ask', f);
-  }
-  assert.strictEqual(decide('Write', { file_path: 'C:\\repo\\.oap\\memoryx.md' }), null);
-  assert.strictEqual(bash('cat .oap/memory/entries/tests/p-20261126-7f3a.md'), null);
-  assert.strictEqual(bash('rm -rf .oap/memory/entries'), 'ask');
-  assert.strictEqual(bash('echo x > ~/.oap/knowledge/entries/odoo/g-20261126-aa10.md'), 'ask');
-  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/knowledge.js" search "picking lotes"`), 'allow');
-  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/knowledge.js" add --title x --summary y --category tests`), 'allow');
-  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/knowledge.js" remove g-20261126-aa10`), 'ask');
-  assert.strictEqual(sh(`node "${SQUAD_SCRIPTS}/oap.js" knowledge remove p-20261126-7f3a`), 'ask');
-  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/knowledge.js" migrate --apply`), 'ask');
-  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/knowledge.js" migrate --dry-run`), 'allow');
-  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/knowledge.js" migrate`), 'allow');
-  assert.strictEqual(sh(`node "${OWN_SCRIPTS}/knowledge.js" migrate --rollback 20261126-101010`), 'ask');
-});
-
-test('subagents can search knowledge but not write it during a task', () => {
-  const sub = (command, opts = {}) => decideYolo('Bash', { command }, { agentId: 'a1', ...opts });
-  for (const cmd of ['add --title x', 'update p-20261126-7f3a --status verified', 'deprecate p-20261126-7f3a', 'reindex', 'migrate --apply']) {
-    assert.strictEqual(sub(`node "C:/p/scripts/knowledge.js" ${cmd}`), 'deny', cmd);
-    assert.strictEqual(sub(`node "C:/p/scripts/oap.js" knowledge ${cmd}`), 'deny', cmd);
-  }
-  assert.strictEqual(sub('node "C:/p/scripts/knowledge.js" search "lotes"'), null);
-  assert.strictEqual(sub('node "C:/p/scripts/oap.js" knowledge.js get p-20261126-7f3a'), null);
-  assert.strictEqual(sub('node "C:/p/scripts/knowledge.js" add --title x', { active: false }), null);
+test('memory with oap-memory: yolo approves its scripts; with mem-guard, remove/migrate still ask and subagent writes are denied', () => {
+  // Claude Code keeps the most restrictive decision of all PreToolUse hooks (checked with Claude Code 2.1.332).
+  const memguard = require('../../oap-memory/scripts/lib/memguard');
+  const MEM_SCRIPTS = path.join(__dirname, '..', '..', 'oap-memory', 'scripts').split(path.sep).join('/');
+  const RANK = { deny: 3, ask: 2, allow: 1 };
+  const effective = (command, opts = {}) => {
+    const own = decideYolo('Bash', { command }, opts);
+    const m = memguard.evaluate({ tool_name: 'Bash', tool_input: { command }, cwd: process.cwd(), ...(opts.agentId ? { agent_id: opts.agentId } : {}) },
+      { sessionActive: () => opts.active !== false });
+    const all = [own, m && m.decision].filter(Boolean);
+    return all.sort((a, b) => RANK[b] - RANK[a])[0] || null;
+  };
+  assert.strictEqual(effective(`node "${MEM_SCRIPTS}/knowledge.js" search "picking lotes"`), 'allow');
+  assert.strictEqual(effective(`node "${MEM_SCRIPTS}/knowledge.js" add --title x --summary y --category tests`), 'allow');
+  assert.strictEqual(effective(`node "${OWN_SCRIPTS}/mem.js" context --task t.md`), 'allow');
+  assert.strictEqual(effective(`node "${SQUAD_SCRIPTS}/mem.js" add --title x`), 'allow');
+  assert.strictEqual(effective(`node "${MEM_SCRIPTS}/knowledge.js" remove g-20261126-aa10`), 'ask');
+  assert.strictEqual(effective(`node "${OWN_SCRIPTS}/mem.js" remove p-20261126-7f3a`), 'ask');
+  assert.strictEqual(effective(`node "${MEM_SCRIPTS}/knowledge.js" migrate --apply`), 'ask');
+  assert.strictEqual(effective(`node "${MEM_SCRIPTS}/knowledge.js" migrate`), 'allow');
+  assert.strictEqual(effective(`node "${OWN_SCRIPTS}/mem.js" add --title x`, { agentId: 'a1' }), 'deny');
+  assert.strictEqual(effective(`node "${OWN_SCRIPTS}/mem.js" search lotes`, { agentId: 'a1' }), 'allow');
+  // A knowledge.js outside the real plugin folders is not approved by yolo.
+  assert.strictEqual(decideYolo('Bash', { command: 'node "C:/repo/scripts/knowledge.js" search x' }), null);
 });

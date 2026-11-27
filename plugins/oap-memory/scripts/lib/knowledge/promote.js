@@ -70,14 +70,14 @@ function submodulePaths(root) {
 
 /**
  * Words that identify this project and must not reach global knowledge: own module names (folders with a
- * __manifest__.py, up to 3 levels, outside git submodules), the repo folder name, the Odoo.sh project and the
- * staging branch. Generic words are left out.
+ * __manifest__.py, up to 3 levels, outside git submodules), the repo folder name and the names the plugins declare
+ * (e.g. Odoo.sh project and staging branch). Generic words are left out.
  * @param {string} root - repo root
- * @param {object} [config] - project config
+ * @param {string[]} [declared] - project names read through the plugins' memory.json
  * @returns {string[]} terms
  */
-function projectTerms(root, config = {}) {
-  const terms = new Set([path.basename(root), config.odoo_sh_project, config.staging_branch].filter(Boolean));
+function projectTerms(root, declared = []) {
+  const terms = new Set([path.basename(root), ...declared].filter(Boolean));
   const submodules = submodulePaths(root);
   const walk = (dir, depth) => {
     let items;

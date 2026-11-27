@@ -2,7 +2,18 @@
 'use strict';
 // CLI to create, show, validate and migrate .oap/odoosh-browser/config.json in an Odoo module repo.
 const path = require('path');
+const { spawnSync } = require('child_process');
 const { CONFIG_REL, DEFAULTS, loadConfig, validateConfig, saveConfig, migrateLegacy, ensureExcluded } = require('./lib/config');
+
+/**
+ * Run an oap-memory command through mem.js and return its output ('' when oap-memory is missing or fails).
+ * @param {string[]} args - mem.js arguments
+ * @returns {string} trimmed stdout
+ */
+function mem(args) {
+  const res = spawnSync(process.execPath, [path.join(__dirname, 'mem.js'), ...args], { encoding: 'utf8', timeout: 30000 });
+  return res.status === 0 ? String(res.stdout || '').trim() : '';
+}
 
 /**
  * Parse --key value pairs from argv.
@@ -58,12 +69,13 @@ function main() {
     const problems = validateConfig(loaded.config);
     printProblems(problems);
     if (loaded.legacy) console.log('Warning: files in the old location (.claude/). Run "config.js migrate" to move them to .oap/.');
-    if (require('./lib/knowledge/migrate').needsMigration(loaded.root)) {
-      console.log('Warning: project memory in the old format. Review "knowledge.js migrate" (dry-run) and apply it with "knowledge.js migrate --apply".');
-    }
+    const memWarning = mem(['migrate', '--needed', '--dir', loaded.root]);
+    if (memWarning) console.log(memWarning);
     process.exit(problems.length ? 1 : 0);
   } else if (cmd === 'migrate') {
     const res = migrateLegacy(loaded.root);
+    // Old .claude/*-notes.json into .oap/memory.md: done by oap-memory.
+    res.notes = Number((/(\d+)$/.exec(mem(['notes', 'migrate-legacy', '--dir', loaded.root])) || [])[1] || 0);
     res.moved.forEach((r) => console.log(`Moved: ${r}`));
     res.skipped.forEach((r) => console.log(`Unchanged (target already exists): ${r}`));
     if (res.notes) console.log(`Notes converted to .oap/memory.md: ${res.notes}`);

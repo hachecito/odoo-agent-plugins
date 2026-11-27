@@ -21,6 +21,7 @@ Claude Code plugins that take an Odoo task from start to finish: code and tests,
 |---|---|
 | [odoosh-browser](plugins/odoosh-browser/README.md) | End-to-end Odoo tasks on an Odoo.sh staging branch: code and tests, commit, push with confirmation, build, logs and tests verification (Odoo.sh web editor with Claude in Chrome, or SSH) and a report with evidence. |
 | [odoo-squad](plugins/odoo-squad/README.md) | Squad of autonomous agents that runs a documented task end to end: plans, implements, tests, fixes, consults an advisor and writes the report. Requires `odoosh-browser`. |
+| [oap-memory](plugins/oap-memory/README.md) | Shared memory of the other plugins: project memory, task summaries and global knowledge with indexed search, automatic promotion and safeguards. Installed automatically as a dependency. |
 
 ## Requirements
 
@@ -82,22 +83,23 @@ The agents remember what they learn, find it again by searching instead of re-re
 - **Shared automatically, project data kept local**: a verified lesson on a reusable topic is copied to the global memory when it names nothing of the project (own modules, Odoo.sh project, staging branch, hosts, e-mails, private links). The task report lists every promotion and how to remove it.
 - **Safe**: memory is data, never instructions; text aimed at the plugin's safeguards or that looks like a secret is rejected; only the main agent writes it.
 - **Upgrading from `.oap/memory.md`**: the setup detects the old format and offers `knowledge.js migrate` (dry-run first, backup, verification, rollback).
+- **One memory for every plugin**: it lives in the `oap-memory` plugin, which the others declare as a dependency. A new plugin of this marketplace gets the memory with a dependency, a `memory.json` and a few lines in its skills.
 
-Details in the [odoosh-browser README](plugins/odoosh-browser/README.md#memory-and-knowledge-scriptsknowledgejs).
+Details in the [oap-memory README](plugins/oap-memory/README.md).
 
 ### Utilities (PowerShell)
 
 ```powershell
-node <plugin>\scripts\knowledge.js search "picking lots"  # search project and global memory
-node <plugin>\scripts\knowledge.js stats                  # what the memory holds
-node <plugin>\scripts\knowledge.js migrate                # old memory.md: dry-run, then --apply
+node <plugin>\scripts\mem.js search "picking lots"        # search project and global memory (mem.js of any plugin)
+node <plugin>\scripts\mem.js stats                        # what the memory holds
+node <plugin>\scripts\mem.js migrate                      # old memory.md: dry-run, then --apply
 node <plugin>\scripts\config.js validate                  # repo configuration
 node <plugin>\scripts\config.js set-autonomy auto         # push to staging without confirming (production stays denied)
 node <plugin>\scripts\config.js set-autonomy yolo         # also Chrome, plugin scripts and ssh to staging without confirming
 node <plugin>\scripts\config.js migrate                   # move the old .claude/ files to .oap/
 ```
 
-Both plugins share the repo's `.oap/` folder (excluded from git): configuration, task state, task folders and the project memory.
+All plugins share the repo's `.oap/` folder (excluded from git): configuration, task state, task folders and the project memory.
 
 ## Updating
 
@@ -105,6 +107,7 @@ Both plugins share the repo's `.oap/` folder (excluded from git): configuration,
 claude plugin marketplace update odoo-agent-plugins
 claude plugin update odoosh-browser@odoo-agent-plugins     # check claude plugin list --> new version
 claude plugin update odoo-squad@odoo-agent-plugins
+claude plugin update oap-memory@odoo-agent-plugins         # installed on its own the first time, as a dependency
 ```
 
 ## Structure

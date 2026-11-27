@@ -6,8 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { writeFileAtomic, readFileStable, withLock } = require('../fsatomic');
-const { agentFile, legacyFile } = require('../config');
-const { parseMemory } = require('../notes');
+const { parseMemory, memoryFile: memoryPath, legacyNotesFile } = require('../notes');
 const { SCHEMA_VERSION, serializeEntry } = require('./schema');
 const { validateEntry } = require('./validate');
 const { projectStore, storeLock, writeEntry, listSources, readEntryFile, CATEGORY_RE } = require('./store');
@@ -151,9 +150,9 @@ function oldTasks(tasksDir) {
  */
 function planMigration(root, stamp = timestamp()) {
   const store = projectStore(root);
-  const memoryFile = agentFile(root, 'memory');
+  const memoryFile = memoryPath(root);
   const existing = migratedHashes(store);
-  const plan = { stamp, memoryFile: fs.existsSync(memoryFile) ? memoryFile : null, notes: [], tasks: [], unparsed: [], legacyJson: legacyFile(root, 'notes'), similar: [] };
+  const plan = { stamp, memoryFile: fs.existsSync(memoryFile) ? memoryFile : null, notes: [], tasks: [], unparsed: [], legacyJson: legacyNotesFile(root), similar: [] };
   if (plan.memoryFile) {
     const text = readFileStable(memoryFile) || '';
     const notes = parseMemory(text);
@@ -446,7 +445,7 @@ function removeEmptyDirs(dir) {
  */
 function needsMigration(root) {
   const store = projectStore(root);
-  if (fs.existsSync(path.join(root, '.oap', 'memory.md')) || legacyFile(root, 'notes')) return true;
+  if (fs.existsSync(path.join(root, '.oap', 'memory.md')) || legacyNotesFile(root)) return true;
   return oldTasks(store.tasksDir).some((t) => !fs.existsSync(path.join(store.tasksDir, t.id, 'summary.md')));
 }
 

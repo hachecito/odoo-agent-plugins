@@ -1,6 +1,27 @@
 'use strict';
 const fs = require('fs');
-const { agentFile, legacyFile } = require('./config');
+const path = require('path');
+
+// Old-format project memory (.oap/memory.md) and the older JSON notes of odoosh-browser <= 0.3.
+const LEGACY_NOTES = ['.claude/odoosh-browser-notes.json', '.claude/odoo-agent-notes.json'];
+
+/**
+ * Old-format memory file of a repo.
+ * @param {string} root - repo root
+ * @returns {string} absolute path of .oap/memory.md
+ */
+function memoryFile(root) {
+  return path.join(root, '.oap', 'memory.md');
+}
+
+/**
+ * First existing legacy JSON notes file.
+ * @param {string} root - repo root
+ * @returns {string|null} absolute path, or null
+ */
+function legacyNotesFile(root) {
+  return LEGACY_NOTES.map((rel) => path.join(root, rel)).find((p) => fs.existsSync(p)) || null;
+}
 const { writeFileAtomic, readFileStable, withLock } = require('./fsatomic');
 const { policyReason, secretReason } = require('./knowledge/validate');
 
@@ -35,7 +56,7 @@ function rejectReason(text) {
  * @returns {string} lock path
  */
 function memoryLock(root) {
-  return `${agentFile(root, 'memory')}.lock`;
+  return `${memoryFile(root)}.lock`;
 }
 
 /**
@@ -64,7 +85,7 @@ function serializeMemory(notes) {
  * @returns {{notes: Array<object>}} notes document
  */
 function loadNotes(root) {
-  const text = readFileStable(agentFile(root, 'memory'));
+  const text = readFileStable(memoryFile(root));
   return { notes: text === null ? [] : parseMemory(text) };
 }
 
@@ -74,7 +95,7 @@ function loadNotes(root) {
  * @param {Array<object>} notes - notes
  */
 function saveNotes(root, notes) {
-  writeFileAtomic(agentFile(root, 'memory'), serializeMemory(notes));
+  writeFileAtomic(memoryFile(root), serializeMemory(notes));
 }
 
 /**
@@ -136,7 +157,7 @@ function renderNotes(doc, tag) {
  * @returns {number} notes imported
  */
 function migrateLegacyNotes(root) {
-  const legacy = legacyFile(root, 'notes');
+  const legacy = legacyNotesFile(root);
   if (!legacy) return 0;
   const old = JSON.parse(fs.readFileSync(legacy, 'utf8')).notes || [];
   const { notes } = loadNotes(root);
@@ -152,4 +173,4 @@ function migrateLegacyNotes(root) {
   return imported;
 }
 
-module.exports = { MAX_NOTES, rejectReason, parseMemory, serializeMemory, loadNotes, addNote, removeNote, renderNotes, migrateLegacyNotes };
+module.exports = { memoryFile, legacyNotesFile, MAX_NOTES, rejectReason, parseMemory, serializeMemory, loadNotes, addNote, removeNote, renderNotes, migrateLegacyNotes };

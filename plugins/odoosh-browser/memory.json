@@ -1,0 +1,9 @@
+{
+  "source": "odoosh-browser",
+  "min_memory_version": "1.0.0",
+  "global_categories": ["odoo", "odoo-sh", "editor", "tests", "tooling", "migration", "debugging"],
+  "project_terms": [
+    { "file": ".oap/odoosh-browser/config.json", "keys": ["odoo_sh_project", "staging_branch"] }
+  ],
+  "odoo_version": { "file": ".oap/odoosh-browser/config.json", "key": "odoo_version" }
+}

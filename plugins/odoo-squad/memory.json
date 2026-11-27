@@ -1,0 +1,8 @@
+{
+  "source": "odoo-squad",
+  "min_memory_version": "1.0.0",
+  "project_terms": [
+    { "file": ".oap/odoosh-browser/config.json", "keys": ["odoo_sh_project", "staging_branch"] }
+  ],
+  "odoo_version": { "file": ".oap/odoosh-browser/config.json", "key": "odoo_version" }
+}

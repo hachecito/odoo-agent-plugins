@@ -1,6 +1,6 @@
 # odoo-squad
 
-Squad of autonomous Odoo agents. Give it a documented task and it carries it out end to end: plans, implements, tests, fixes and verifies on Odoo.sh staging, and learns from the project. It uses the safeguards, state and memory of `odoosh-browser`, which is **required**.
+Squad of autonomous Odoo agents. Give it a documented task and it carries it out end to end: plans, implements, tests, fixes and verifies on Odoo.sh staging, and learns from the project. It uses the safeguards and state of `odoosh-browser` and the memory of `oap-memory`, both **required** and installed with it as dependencies.
 
 ## Usage
 
@@ -66,7 +66,7 @@ Subagents cannot commit or push: the guard denies it and only the orchestrator d
 
 ```
 .oap/
-  memory/                           project memory (knowledge entries, shared with odoosh-browser)
+  memory/                           project memory (oap-memory entries, shared with odoosh-browser)
   odoo-squad/tasks/
     index.md                        one line per task: id · status · title
     20261112-customer-reference/
@@ -78,11 +78,11 @@ Subagents cannot commit or push: the guard denies it and only the orchestrator d
 ~/.oap/knowledge/                   global knowledge shared by every project
 ```
 
-- The orchestrator runs `oap knowledge context` once and hands its output to the planner, which reads an entry's file only when the summary is not enough and cites the ids it relies on. Other agents get only the cited entries; a new failure gets one `oap knowledge search` with at most 3 results.
-- Agents return `[LESSON]` (with a suggested category and the proof they saw) and `[FINDING]`. Only the orchestrator records: lessons with `oap knowledge add`, proven ones as `verified`; findings in `hallazgos.md`; the task in `summary.md` with `oap knowledge task-summary`.
-- Verified lessons of a reusable topic that name nothing of the project are copied to global knowledge automatically; the final report lists them and how to remove each one. Details in the `odoosh-browser` README.
+- The orchestrator opens a memory session (`mem.js session start`), runs `mem.js context` once and hands its output to the planner, which reads an entry's file only when the summary is not enough and cites the ids it relies on. Other agents get only the cited entries; a new failure gets one `mem.js search` with at most 3 results.
+- Agents return `[LESSON]` (with a suggested category and the proof they saw) and `[FINDING]`. Only the orchestrator records: lessons with `mem.js add`, proven ones as `verified`; findings in `hallazgos.md`; the task in `summary.md` with `mem.js task-summary`.
+- Verified lessons of a reusable topic that name nothing of the project are copied to global knowledge automatically; the final report lists them and how to remove each one. Details in the [oap-memory README](../oap-memory/README.md).
 - `scripts/tasks.js` creates the folders, maintains the index and migrates the 0.1.0 format (`tasks migrate`). Task statuses are `in-progress`, `completed`, `blocked`, `abandoned` and `migrated`; the Spanish ones from earlier versions are still accepted.
-- The `odoosh-browser` memory hook (reminder to note findings) also works during `squad-run`.
+- The oap-memory hook (reminder to note findings) works while the memory session of `squad-run` is open.
 
 ## Planned (next versions)
 

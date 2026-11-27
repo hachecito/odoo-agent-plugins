@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 'use strict';
-// Stop / PostToolUseFailure hook: nudges the agent to record findings in .oap/memory.md during an active run.
+// Stop / PostToolUseFailure hook: nudges the agent to record findings while a memory session is open.
 const { decide } = require('./lib/memory-hook');
-const { loadConfig } = require('./lib/config');
+const { findOapRoot } = require('./lib/root');
 
 /** Read the hook event from stdin and print the answer, if any. Never blocks on its own errors. */
 function main() {
@@ -11,7 +11,7 @@ function main() {
   process.stdin.on('data', (c) => { data += c; });
   process.stdin.on('end', () => {
     try {
-      const out = decide(JSON.parse(data || '{}'), { loadConfig });
+      const out = decide(JSON.parse(data || '{}'), { findRoot: findOapRoot });
       if (out) process.stdout.write(JSON.stringify(out));
     } catch {
       // A reminder must never break the session.

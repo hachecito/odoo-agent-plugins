@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 'use strict';
-// Runs a script of the odoosh-browser plugin (run-state.js, knowledge.js, notes.js, config.js, report.js) from odoo-squad.
+// Runs a script of the odoosh-browser plugin (run-state.js, config.js, report.js, ...) from odoo-squad. Memory: mem.js.
 // Usage: node oap.js <script> [args...]   |   node oap.js --where
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-// odoo-squad relies on .oap/, autonomy (yolo), the subagent rules and knowledge.js (context, task-summary) of this odoosh-browser version.
-const MIN_VERSION = '0.13.0';
+// odoo-squad relies on .oap/, autonomy (yolo), the subagent rules and the report with the oap-memory session of this version.
+const MIN_VERSION = '0.14.0';
 
 /**
  * Read the version of a plugin folder.
@@ -47,7 +47,7 @@ function locate(env = process.env, home = os.homedir(), here = __dirname) {
   const candidates = [];
   if (env.OAP_ODOOSH_BROWSER) candidates.push(env.OAP_ODOOSH_BROWSER);
   try {
-    const installed = JSON.parse(fs.readFileSync(path.join(home, '.claude', 'plugins', 'installed_plugins.json'), 'utf8'));
+    const installed = JSON.parse(fs.readFileSync(path.join(env.CLAUDE_CONFIG_DIR || path.join(home, '.claude'), 'plugins', 'installed_plugins.json'), 'utf8'));
     for (const [key, entries] of Object.entries(installed.plugins || {})) {
       if (key.startsWith('odoosh-browser@')) for (const e of entries) candidates.push(e.installPath);
     }
@@ -88,7 +88,7 @@ function main() {
     return;
   }
   if (!/^[a-z-]+\.js$/.test(script || '') || !fs.existsSync(path.join(dir, script))) {
-    console.error('Usage: oap.js <run-state|notes|knowledge|config|report|ssh-check>[.js] [args...]');
+    console.error('Usage: oap.js <run-state|config|report|ssh-check|hotpatch|diag>[.js] [args...] (memory: mem.js)');
     process.exit(1);
   }
   const res = spawnSync(process.execPath, [path.join(dir, script), ...args], { stdio: 'inherit' });
