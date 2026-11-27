@@ -34,6 +34,9 @@ Below `le` means `node "${CLAUDE_PLUGIN_ROOT}/scripts/localenv.js"`. Everything 
 ## Work with it
 
 - `le list`: environments, state, port, kept or released, disk used.
+- Code changes in the repo folder are seen live (read-only mount): Python changes need `le restart --name <n>`; views, data and new fields need `le update`.
+- `le rebuild --name <n> [--repo <dir>] [--pip a,b]`: after new submodules or requirements, to point the environment to another folder of the repo, or to add pip packages a module imports without declaring them (an "No module named X" in the log). The database is kept.
+- If Odoo answers HTTP 500, read the ERROR/CRITICAL lines of the log and tell the user: they are usually project errors (a module or a view of the database), not environment errors.
 - `le update --name <n> --modules a,b` (`-u`) / `le install --name <n> --modules a,b` (`-i`): stops the server, runs the update, restarts.
 - `le test --name <n> --modules a,b [--tags ...]`: runs the module tests (default tags `/module`) and returns the exit code; quote the failing tests from the output.
 - `le logs --name <n> [--tail 500]`, `le stop|start --name <n>` (stop frees RAM and keeps everything).
