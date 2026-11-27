@@ -11,6 +11,8 @@ const { tokenize, loadIndex, indexFiles } = require('../scripts/lib/knowledge/in
 const { search, formatResults, context } = require('../scripts/lib/knowledge/search');
 
 const CLI = path.join(__dirname, '..', 'scripts', 'knowledge.js');
+// A plugin declaration like odoosh-browser's: project names come from .oap/odoosh-browser/config.json.
+const PLUGINS = path.join(__dirname, 'fixtures', 'odoosh-like');
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'oap-knowledge-'));
 
 /** Valid entry data with overrides. */
@@ -44,7 +46,7 @@ function repo(modules = []) {
 
 /** Run the CLI in a repo with an isolated global store. */
 function cli(r, ...args) {
-  const res = spawnSync(process.execPath, [CLI, ...args, '--dir', r.root], { encoding: 'utf8', env: { ...process.env, OAP_HOME: r.home } });
+  const res = spawnSync(process.execPath, [CLI, ...args, '--dir', r.root], { encoding: 'utf8', env: { ...process.env, OAP_HOME: r.home, OAP_MEMORY_PLUGINS: PLUGINS } });
   return { status: res.status, out: `${res.stdout}${res.stderr}` };
 }
 
@@ -261,7 +263,7 @@ test('promotion: OCA submodules and generic branch names do not block reusable k
   fs.mkdirSync(path.join(r.root, 'third', 'web', 'web_responsive'), { recursive: true });
   fs.writeFileSync(path.join(r.root, 'third', 'web', 'web_responsive', '__manifest__.py'), '{}');
   fs.writeFileSync(path.join(r.root, '.gitmodules'), '[submodule "web"]\n\tpath = third/web\n\turl = https://github.com/OCA/web\n');
-  const terms = projectTerms(r.root, { staging_branch: 'staging', odoo_sh_project: 'acme-prod' });
+  const terms = projectTerms(r.root, ['staging', 'acme-prod']);
   assert.ok(terms.includes('my_module') && terms.includes('acme-prod'), terms.join());
   for (const t of ['queue_job', 'web_responsive', 'staging']) assert.ok(!terms.includes(t), t);
   fs.writeFileSync(path.join(r.root, '.oap', 'odoosh-browser', 'config.json'), JSON.stringify({ staging_branch: 'staging' }));
@@ -304,13 +306,12 @@ test('duplicates: distinct real lessons do not collide; the refusal shows the ov
   fs.rmSync(r.base, { recursive: true, force: true });
 });
 
-test('task-summary, run recording and report: what was added and promoted is listed with how to undo it', () => {
+test('task-summary, session recording and report: what was added and promoted is listed with how to undo it', () => {
   const r = repo();
   const folder = path.join(r.root, '.oap', 'odoo-squad', 'tasks', '20261126-fix-lotes');
   fs.mkdirSync(folder, { recursive: true });
   fs.writeFileSync(path.join(folder, 'task.md'), '# Corregir lotes en recepciones\n\nLas recepciones parciales pierden el lote.\n');
-  const runFile = path.join(r.root, '.oap', 'odoosh-browser', 'run.json');
-  fs.writeFileSync(runFile, JSON.stringify({ task: 'x', staging_branch: 'stg', state: 'IMPLEMENTATION', started_at: new Date().toISOString(), history: [], evidence: [], fix_cycles: 0 }));
+  assert.match(cli(r, 'session', 'start', '--source', 'odoosh-browser', '--task', '20261126-fix-lotes').out, /Memory session open for odoosh-browser/);
   cli(r, 'add', '--title', 'Lotes y series en tests de stock', '--summary', 'Usar lot_producer_id en Odoo 18 para los tests de lotes.', '--category', 'tests',
     '--status', 'verified', '--evidence', 'odoo/odoo@18.0:addons/stock/models/stock_lot.py:10');
   const ts = cli(r, 'task-summary', '--folder', folder, '--summary', 'Se conserva el lote al validar recepciones parciales.', '--outcome', 'completed', '--modules', 'stock_custom');
@@ -319,12 +320,23 @@ test('task-summary, run recording and report: what was added and promoted is lis
   // Rewriting keeps the same id (idempotent with the migration formula).
   const again = cli(r, 'task-summary', '--folder', folder, '--summary', 'Corregido y verificado en staging.', '--outcome', 'completed');
   assert.strictEqual(/Task summary (t-\S+)/.exec(again.out)[1], /Task summary (t-\S+)/.exec(ts.out)[1]);
-  const run = JSON.parse(fs.readFileSync(runFile, 'utf8'));
-  assert.deepStrictEqual(run.knowledge.map((k) => k.action), ['added', 'promoted']);
-  const { render } = require('../scripts/report');
-  const report = render(run);
+  const items = JSON.parse(cli(r, 'session', 'report', '--json').out).items;
+  assert.deepStrictEqual(items.map((k) => k.action), ['added', 'promoted']);
+  const entryFile = fs.readdirSync(path.join(r.root, '.oap', 'memory', 'entries', 'tests'))[0];
+  assert.match(fs.readFileSync(path.join(r.root, '.oap', 'memory', 'entries', 'tests', entryFile), 'utf8'), /^source: odoosh-browser$/m);
+  const report = cli(r, 'session', 'report').out;
   assert.match(report, /## Knowledge[\s\S]*Added to project memory: p-[\s\S]*Promoted to global knowledge: p-\S+ "Lotes y series en tests de stock" → g-\S+ \(remove from global: knowledge\.js remove g-/);
   assert.match(cli(r, 'task-summary', '--folder', path.join(r.root, '..'), '--summary', 'x').out, /No task\.md|outside the store/);
+  assert.match(cli(r, 'session', 'end').out, /Memory session closed/);
+  // Lessons written while closing the task (just after the session closed) still go to its report...
+  cli(r, 'add', '--title', 'Otra leccion distinta sobre rutas', '--summary', 'Las rutas de reabastecimiento necesitan almacen.', '--category', 'odoo');
+  assert.strictEqual(JSON.parse(cli(r, 'session', 'report', '--json').out).items.length, 3);
+  // ...but not hours later.
+  const sFile = path.join(r.root, '.oap', 'memory-session.json');
+  const s = JSON.parse(fs.readFileSync(sFile, 'utf8'));
+  fs.writeFileSync(sFile, JSON.stringify({ ...s, ended_at: new Date(Date.now() - 7 * 3600 * 1000).toISOString() }));
+  cli(r, 'add', '--title', 'Tarifas con decimales en la factura', '--summary', 'El redondeo de la tarifa usa la moneda.', '--category', 'odoo');
+  assert.strictEqual(JSON.parse(cli(r, 'session', 'report', '--json').out).items.length, 3);
   fs.rmSync(r.base, { recursive: true, force: true });
 });
 

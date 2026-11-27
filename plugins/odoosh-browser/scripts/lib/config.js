@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { writeFileAtomic, readFileStable } = require('./fsatomic');
 
-// Per-repo files live under .oap/ (shared by all Odoo agent plugins). memory.md is shared; the rest is per plugin.
+// Per-repo files live under .oap/ (shared by all Odoo agent plugins). The memory files belong to oap-memory.
 // Older locations (.claude/odoosh-browser*.json, .claude/odoo-agent*.json) are still read until "config.js migrate".
 const OAP_DIR = '.oap';
 const PLUGIN_DIR = 'odoosh-browser';
@@ -11,20 +11,18 @@ const AGENT_FILES = {
   config: path.join(OAP_DIR, PLUGIN_DIR, 'config.json'),
   run: path.join(OAP_DIR, PLUGIN_DIR, 'run.json'),
   throttle: path.join(OAP_DIR, PLUGIN_DIR, 'throttle.json'),
-  memory: path.join(OAP_DIR, 'memory.md'),
 };
 const LEGACY_FILES = {
   config: ['.claude/odoosh-browser.json', '.claude/odoo-agent.json'],
   run: ['.claude/odoosh-browser-run.json', '.claude/odoo-agent-run.json'],
   throttle: ['.claude/odoosh-browser-throttle.json', '.claude/odoo-agent-throttle.json'],
-  notes: ['.claude/odoosh-browser-notes.json', '.claude/odoo-agent-notes.json'],
 };
 const CONFIG_REL = AGENT_FILES.config;
 
 /**
  * First existing legacy file of a kind in a repo.
  * @param {string} root - repo root
- * @param {string} kind - config | run | throttle | notes
+ * @param {string} kind - config | run | throttle
  * @returns {string|null} absolute path, or null
  */
 function legacyFile(root, kind) {
@@ -35,7 +33,7 @@ function legacyFile(root, kind) {
 /**
  * Resolve a plugin file in a repo, falling back to a legacy location when only that one exists.
  * @param {string} root - repo root containing .oap/
- * @param {string} kind - config | run | throttle | memory
+ * @param {string} kind - config | run | throttle
  * @returns {string} absolute file path
  */
 function agentFile(root, kind) {
@@ -145,12 +143,12 @@ function ensureExcluded(root) {
 }
 
 /**
- * Move legacy .claude files into .oap/, convert legacy JSON notes to memory.md and exclude .oap/ from git.
+ * Move legacy .claude files into .oap/ and exclude .oap/ from git (old JSON notes are converted by oap-memory).
  * @param {string} root - repo root
- * @returns {{moved: string[], skipped: string[], notes: number, excluded: string[], excludeFile: string|null}} summary
+ * @returns {{moved: string[], skipped: string[], excluded: string[], excludeFile: string|null}} summary
  */
 function migrateLegacy(root) {
-  const result = { moved: [], skipped: [], notes: 0 };
+  const result = { moved: [], skipped: [] };
   for (const kind of ['config', 'run', 'throttle']) {
     const target = path.join(root, AGENT_FILES[kind]);
     for (const rel of LEGACY_FILES[kind]) {
@@ -162,9 +160,6 @@ function migrateLegacy(root) {
       result.moved.push(`${rel} -> ${AGENT_FILES[kind]}`);
     }
   }
-  // Lazy require: notes.js depends on this module.
-  const { migrateLegacyNotes } = require('./notes');
-  result.notes = migrateLegacyNotes(root);
   return { ...result, ...ensureExcluded(root) };
 }
 

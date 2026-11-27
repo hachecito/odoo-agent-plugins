@@ -22,7 +22,7 @@ Do not ask what the repo code or the memory already answers: decide it and say s
 
 ## Plan mode
 
-Input: the task (text or path to the `.md`), the clarifications already resolved (`aclaraciones.md` in the task folder, if any; they override your assumptions), the **memory context** (output of `knowledge.js context`: project profile, relevant knowledge, similar past tasks, each with its id and file path) and, for a revision, the previous plan and the failure.
+Input: the task (text or path to the `.md`), the clarifications already resolved (`aclaraciones.md` in the task folder, if any; they override your assumptions), the **memory context** (output of `mem.js context` (oap-memory): project profile, relevant knowledge, similar past tasks, each with its id and file path) and, for a revision, the previous plan and the failure.
 
 Memory by levels: the context gives summaries. Read an entry's file (its path is in the context) only when the summary is not enough, and a past task's folder only if it is related. Never read `.oap/memory/` or `~/.oap/knowledge/` whole. In the plan, cite the ids of the entries you rely on (e.g. `p-20261120-3c1a`) so the orchestrator can hand them to the agents.
 

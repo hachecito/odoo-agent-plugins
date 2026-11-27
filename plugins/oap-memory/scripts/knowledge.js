@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 'use strict';
-// Knowledge Manager CLI: project memory (.oap/memory), global knowledge (~/.oap/knowledge) and task summaries.
-// Reading commands are free; writing ones are for the orchestrator only (the guard denies them to subagents).
+// Knowledge Manager CLI (oap-memory): project memory (.oap/memory), global knowledge (~/.oap/knowledge), task
+// summaries and the memory session of a plugin task. Reading commands are free; writing ones are for the
+// orchestrator only (mem-guard denies them to subagents during a session).
 const fs = require('fs');
 const path = require('path');
-const { loadConfig } = require('./lib/config');
-const { getSection, ID_RE, SCHEMA_VERSION, SCOPES, STATUSES } = require('./lib/knowledge/schema');
+const { findRoot, ensureExcluded } = require('./lib/root');
+const { loadDeclarations, projectFacts, globalCategories } = require('./lib/plugins');
+const { startSession, endSession, loadSession, isSessionActive, recordInSession, renderKnowledge } = require('./lib/session');
+const { getSection, ID_RE, SCHEMA_VERSION, SCOPES, STATUSES, GLOBAL_CATEGORIES } = require('./lib/knowledge/schema');
 const {
   projectStore, globalStore, today, newId, findEntryFile, readEntryFile, storeLock, writeEntry, deleteEntry,
   sourcePath, withLock,
@@ -21,15 +24,16 @@ const USAGE = `Usage: knowledge.js <command> [options]
   get <id> [--section "How to apply"] [--max-chars 4000]
   context (--task <task.md> | --text "...") [--budget 1500] [--odoo 18.0]
   add --title "..." --summary "..." --category c [--type gotcha] [--tag t]... [--odoo 18.0]... [--status observed|verified]
-      [--evidence "..."]... [--fact "..."] [--how "..."] [--body-file f.md] [--force-new]
+      [--evidence "..."]... [--fact "..."] [--how "..."] [--body-file f.md] [--force-new] [--source <plugin>]
   update <id> [--title|--summary|--category|--type|--status "..."] [--tag t]... [--odoo v]... [--evidence "..."]... [--body-file f.md]
   deprecate <id> [--by <id>]
   remove <id>
   validate [<id>]
   task-summary --folder <task folder> --summary "..." [--outcome completed|blocked|abandoned|in-progress] [--modules a,b] [--files a,b]
-  migrate [--dry-run] | --apply | --history | --rollback <stamp>
+  migrate [--dry-run] | --apply | --history | --rollback <stamp> | --needed
   reindex [--full]
   stats
+  session start --source <plugin> [--task <id or title>] | session end | session status | session report [--json]
 Options valid everywhere: --dir <repo path>`;
 
 /**
@@ -40,7 +44,7 @@ Options valid everywhere: --dir <repo path>`;
 function parseArgs(argv) {
   const pos = [];
   const flags = {};
-  const BOOL = new Set(['include-deprecated', 'force-new', 'full', 'json', 'apply', 'dry-run', 'history']);
+  const BOOL = new Set(['include-deprecated', 'force-new', 'full', 'json', 'apply', 'dry-run', 'history', 'needed']);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith('--')) { pos.push(a); continue; }
@@ -111,29 +115,25 @@ function bodyFrom(flags) {
 }
 
 /**
- * Record a knowledge action in the active run (run.json), so the final report lists it. No active run: nothing.
- * @param {object} loaded - loaded project config
+ * Record a knowledge action in the open memory session, so the task report lists it. No session: nothing.
+ * @param {object} loaded - project context {root}
  * @param {object} item - {action, id, title, global?, reason?}
  */
 function recordInRun(loaded, item) {
-  const { loadRun, saveRun, isRunActive } = require('./lib/run');
-  if (!isRunActive(loaded.root)) return;
-  const run = loadRun(loaded.root);
-  run.knowledge = [...(run.knowledge || []), { at: new Date().toISOString(), ...item }];
-  saveRun(loaded.root, run);
+  recordInSession(loaded.root, item);
 }
 
 /**
  * Promote a verified project entry if it qualifies, record promoted_to, and describe the outcome.
  * @param {object} stores - {project, global}
- * @param {object} loaded - loaded project config
+ * @param {object} loaded - project context {root, decls, facts}
  * @param {object} data - project entry data (already written)
  * @param {string} body - entry body
  * @returns {string|null} line for the user, or null when nothing applies
  */
 function autoPromote(stores, loaded, data, body) {
   if (data.scope !== 'project' || data.status !== 'verified' || data.promoted_to || data.no_promote) return null;
-  const res = promote(stores.global, data, body, { projectTerms: projectTerms(loaded.root, loaded.config) });
+  const res = promote(stores.global, data, body, promoteCtx(loaded));
   const gid = res.promoted || res.merged;
   if (!gid) {
     recordInRun(loaded, { action: 'kept-in-project', id: data.id, title: data.title, reason: res.skipped.join(' ') });
@@ -151,6 +151,42 @@ function autoPromote(stores, loaded, data, body) {
     : `Already in global knowledge as ${gid}: confirmation added.`;
 }
 
+/**
+ * Words and categories the global checks use for this project.
+ * @param {object} loaded - project context {root, decls, facts}
+ * @returns {{projectTerms: string[], globalCategories: string[]}} promotion context
+ */
+function promoteCtx(loaded) {
+  return { projectTerms: projectTerms(loaded.root, loaded.facts.terms), globalCategories: globalCategories(GLOBAL_CATEGORIES, loaded.decls) };
+}
+
+/**
+ * Handle "session start|end|status|report".
+ * @param {object} loaded - project context
+ * @param {string[]} pos - positionals
+ * @param {object} flags - flags
+ */
+function sessionCmd(loaded, pos, flags) {
+  const sub = pos[0];
+  if (sub === 'start') {
+    const source = one(flags, 'source');
+    if (!source || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(source)) fail('session start needs --source <plugin name>');
+    startSession(loaded.root, { source, task: one(flags, 'task') });
+    console.log(`Memory session open for ${source}: lessons noted now appear in the task report. Close it with: session end`);
+  } else if (sub === 'end') {
+    console.log(endSession(loaded.root) ? 'Memory session closed.' : 'No open memory session.');
+  } else if (sub === 'status') {
+    const s = loadSession(loaded.root);
+    console.log(s ? `${isSessionActive(loaded.root) ? 'open' : 'closed'} · ${s.source} · ${s.task || '-'} · ${(s.items || []).length} item(s) · started ${s.started_at}` : 'No memory session.');
+  } else if (sub === 'report') {
+    const s = loadSession(loaded.root);
+    if (one(flags, 'json')) console.log(JSON.stringify({ items: (s && s.items) || [] }));
+    else process.stdout.write(renderKnowledge(s));
+  } else {
+    fail('Usage: session start --source <plugin> [--task <id>] | session end | session status | session report [--json]');
+  }
+}
+
 /** Entry point. */
 function main() {
   const [cmd, ...rest] = process.argv.slice(2);
@@ -158,11 +194,17 @@ function main() {
   let args;
   try { args = parseArgs(rest); } catch (err) { fail(err.message); }
   const { pos, flags } = args;
-  const loaded = loadConfig(one(flags, 'dir') || process.cwd());
-  if (!loaded) fail('No .oap/odoosh-browser/config.json: run the odoo-project-setup skill first.');
+  const { root } = findRoot(one(flags, 'dir') || process.cwd());
+  const decls = loadDeclarations();
+  const loaded = { root, decls, facts: projectFacts(root, decls) };
   const stores = { project: projectStore(loaded.root), global: globalStore() };
   const both = [stores.project, stores.global];
-  const odoo = one(flags, 'odoo') || loaded.config.odoo_version || undefined;
+  const odoo = one(flags, 'odoo') || loaded.facts.odoo || undefined;
+  // The first write in a repo creates .oap/: keep it out of the client's git status (local exclusion only).
+  const writes = ['add', 'update', 'deprecate', 'remove', 'task-summary', 'reindex'].includes(cmd)
+    || (cmd === 'session' && pos[0] === 'start') || (cmd === 'migrate' && one(flags, 'apply'));
+  if (writes) ensureExcluded(loaded.root);
+  if (cmd === 'session') { sessionCmd(loaded, pos, flags); return; }
 
   if (cmd === 'search') {
     const scope = one(flags, 'scope');
@@ -227,6 +269,8 @@ function main() {
       status: one(flags, 'status') || 'observed', summary: one(flags, 'summary'), evidence: many(flags, 'evidence'),
       superseded_by: null, promoted_to: null, created: date, updated: date, schema_version: SCHEMA_VERSION,
     };
+    const source = one(flags, 'source') || (isSessionActive(loaded.root) ? loadSession(loaded.root).source : null);
+    if (source && /^[a-z0-9][a-z0-9-]{0,63}$/.test(source)) data.source = source;
     const body = bodyFrom(flags);
     const problems = validateEntry(data, body);
     if (problems.length) fail(`Entry not added: ${problems.join(' ')}`);
@@ -285,7 +329,7 @@ function main() {
     if (cmd === 'deprecate' && res.data.promoted_to) {
       console.log(`Its global copy ${res.data.promoted_to} is still active: deprecate it too if it no longer holds anywhere.`);
     } else if (res.data.promoted_to) {
-      const g = updateGlobalCopy(stores.global, res.data.promoted_to, res.data, res.body, { projectTerms: projectTerms(loaded.root, loaded.config) });
+      const g = updateGlobalCopy(stores.global, res.data.promoted_to, res.data, res.body, promoteCtx(loaded));
       if (g.updated) {
         console.log(`Global copy ${g.updated} updated too.`);
         recordInRun(loaded, { action: 'global-updated', id, title: res.data.title, global: g.updated });
@@ -375,8 +419,11 @@ function main() {
     });
     console.log(`Task summary ${data.id} (${outcome}) written to .oap/odoo-squad/tasks/${name}/summary.md`);
   } else if (cmd === 'migrate') {
-    const { planMigration, renderPlan, applyMigration, rollbackMigration, migrationLog } = require('./lib/knowledge/migrate');
-    if (one(flags, 'rollback')) {
+    const { planMigration, renderPlan, applyMigration, rollbackMigration, migrationLog, needsMigration } = require('./lib/knowledge/migrate');
+    if (one(flags, 'needed')) {
+      // Quiet check for other tools (config.js validate): one warning line, or nothing.
+      if (needsMigration(loaded.root)) console.log('Warning: project memory in the old format. Review "knowledge.js migrate" (dry-run) and apply it with "knowledge.js migrate --apply".');
+    } else if (one(flags, 'rollback')) {
       const res = rollbackMigration(loaded.root, one(flags, 'rollback'));
       if (!res.ok) fail(res.message);
       console.log(res.message);

@@ -2,7 +2,18 @@
 'use strict';
 // CLI to track the state and evidence of an odoo-task run (.oap/odoosh-browser/run.json).
 const { loadConfig } = require('./lib/config');
+const path = require('path');
+const { spawnSync } = require('child_process');
 const { STATES, EVIDENCE_STATUS, loadRun, saveRun, verdict } = require('./lib/run');
+
+/**
+ * Close the oap-memory session of the repo when the run ends, so reminders and the subagent memory block stop with
+ * the task even if the skill forgets "mem.js session end". Best effort: memory never blocks the run.
+ * @param {string} root - repo root
+ */
+function endMemorySession(root) {
+  spawnSync(process.execPath, [path.join(__dirname, 'mem.js'), 'session', 'end', '--dir', root], { stdio: 'ignore', timeout: 30000 });
+}
 
 const MAX_FIX_CYCLES = 3;
 
@@ -47,6 +58,10 @@ function main() {
       evidence: [],
     };
     saveRun(root, run);
+    // A new run also opens a new memory session (replacing one left open by an earlier task), so the subagent
+    // memory block and the reminders start with the task even if the skill forgets "mem.js session start".
+    spawnSync(process.execPath, [path.join(__dirname, 'mem.js'), 'session', 'start', '--source', 'odoosh-browser', '--task', run.task || 'odoosh-browser task', '--dir', root],
+      { stdio: 'ignore', timeout: 30000 });
     console.log('Run started (DISCOVERY).');
     return;
   }
@@ -123,6 +138,7 @@ function main() {
     process.exit(1);
   }
   saveRun(root, run);
+  if (cmd === 'close' || (cmd === 'state' && ['COMPLETED', 'FAILED'].includes(run.state))) endMemorySession(root);
   console.log(JSON.stringify({ state: run.state, fix_cycles: run.fix_cycles, ...verdict(run) }, null, 2));
 }
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 // Render the final Markdown report of an odoo-task run from recorded evidence.
+const path = require('path');
+const { spawnSync } = require('child_process');
 const { loadConfig } = require('./lib/config');
 const { REQUIRED_EVIDENCE, loadRun, verdict } = require('./lib/run');
 
@@ -9,9 +11,10 @@ const ICON = { pass: '[OK]', fail: '[FAIL]', skipped: '[NOT RUN]', not_applicabl
 /**
  * Build the Markdown report text.
  * @param {object} run - run state
+ * @param {string} [knowledge] - "## Knowledge" section from oap-memory ('' when nothing was recorded)
  * @returns {string} Markdown report
  */
-function render(run) {
+function render(run, knowledge = '') {
   const v = verdict(run);
   const latest = {};
   for (const e of run.evidence) latest[e.kind] = e;
@@ -36,21 +39,20 @@ function render(run) {
     lines.push('', '## Not yet verified', '');
     [...v.missing, ...v.skipped].forEach((k) => lines.push(`- ${k}`));
   }
-  const k = run.knowledge || [];
-  if (k.length) {
-    lines.push('', '## Knowledge', '');
-    const LABEL = {
-      added: 'Added to project memory', promoted: 'Promoted to global knowledge', 'confirmed-global': 'Already in global knowledge (confirmation added)',
-      'global-updated': 'Global copy updated', 'kept-in-project': 'Verified but kept in the project',
-    };
-    for (const e of k) {
-      const where = e.global ? ` → ${e.global} (remove from global: knowledge.js remove ${e.global})` : '';
-      lines.push(`- ${LABEL[e.action] || e.action}: ${e.id} "${e.title}"${where}${e.reason ? ` — ${e.reason}` : ''}`);
-    }
-  }
+  if (knowledge.trim()) lines.push('', ...knowledge.trim().split('\n'));
   lines.push('', '## History', '');
   run.history.forEach((h) => lines.push(`- ${h.at} ${h.state}${h.note ? ` — ${h.note}` : ''}`));
   return lines.join('\n') + '\n';
+}
+
+/**
+ * Knowledge section of the memory session (oap-memory, through mem.js). Memory never blocks the report.
+ * @param {string} root - repo root
+ * @returns {string} Markdown section, or ''
+ */
+function knowledgeSection(root) {
+  const res = spawnSync(process.execPath, [path.join(__dirname, 'mem.js'), 'session', 'report', '--dir', root], { encoding: 'utf8', timeout: 30000 });
+  return res.status === 0 ? String(res.stdout || '') : '';
 }
 
 /** Entry point: print the report for the run in the current repo. */
@@ -61,8 +63,8 @@ function main() {
     console.error('No run recorded.');
     process.exit(1);
   }
-  process.stdout.write(render(run));
+  process.stdout.write(render(run, knowledgeSection(loaded.root)));
 }
 
 if (require.main === module) main();
-module.exports = { render };
+module.exports = { render, knowledgeSection };

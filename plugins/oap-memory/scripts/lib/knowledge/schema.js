@@ -10,7 +10,7 @@ const TYPES = ['gotcha', 'solution', 'behavior', 'pattern', 'procedure', 'decisi
 const GLOBAL_CATEGORIES = ['odoo', 'odoo-sh', 'editor', 'tests', 'tooling', 'migration', 'debugging'];
 const FIELD_ORDER = [
   'id', 'title', 'type', 'scope', 'category', 'tags', 'odoo_versions', 'status', 'summary',
-  'evidence', 'superseded_by', 'promoted_to', 'no_promote', 'created', 'updated', 'schema_version',
+  'evidence', 'superseded_by', 'promoted_to', 'no_promote', 'source', 'created', 'updated', 'schema_version',
 ];
 const LIST_FIELDS = new Set(['tags', 'odoo_versions', 'evidence']);
 const ID_RE = /^[gpt]-\d{8}-[0-9a-f]{4,8}$/;

@@ -18,30 +18,30 @@ const CHROME_TOOL = /^mcp__(plugin_[^_]+_)?claude-in-chrome__/;
 const OTHER_BROWSER_TOOL = /^mcp__.*(chrome[-_]devtools|playwright|puppeteer|browsermcp|browser[-_]use|browserbase)/i;
 const SHELL_TOOLS = new Set(['Bash', 'PowerShell']);
 const FILE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
-// Guard config, learned notes and the knowledge stores (.oap/memory/, ~/.oap/knowledge/) may only change through
-// their scripts or with user confirmation. Current and legacy (plugin <= 0.3) names are both protected.
-const CONFIG_FILE = /(^|[\\/])(\.oap[\\/](memory\.md|odoosh-browser[\\/]config\.json)|\.claude[\\/](odoosh-browser|odoo-agent)(-notes)?\.json)$|(^|[\\/])\.oap[\\/](memory|knowledge)[\\/]/;
-const PROTECTED_PATH = /(\.oap[\\/](memory\.md|odoosh-browser[\\/]config\.json|memory[\\/]|knowledge[\\/])|(odoosh-browser|odoo-agent)(-notes)?\.json)/;
+// The guard config may only change through config.js or with user confirmation. Current and legacy (plugin <= 0.3)
+// names are both protected. The memory stores are protected by oap-memory's own hook (mem-guard).
+const CONFIG_FILE = /(^|[\\/])(\.oap[\\/]odoosh-browser[\\/]config\.json|\.claude[\\/](odoosh-browser|odoo-agent)\.json)$/;
+const PROTECTED_PATH = /(\.oap[\\/]odoosh-browser[\\/]config\.json|(odoosh-browser|odoo-agent)\.json)/;
 // Programs that write, copy, move or delete the file named in their arguments.
 const WRITER_PROGRAMS = new Set(['tee', 'cp', 'mv', 'rm', 'del', 'copy', 'move', 'set-content', 'add-content', 'out-file', 'copy-item', 'move-item', 'remove-item', 'new-item', 'sc', 'ac', 'ni']);
 // Yolo mode: these scripts of the Odoo agent plugins run without a prompt, only from a real plugin root (see trustedRoots).
-const YOLO_SCRIPTS = new Set(['run-state.js', 'notes.js', 'knowledge.js', 'report.js', 'ssh-check.js', 'config.js', 'oap.js', 'tasks.js', 'hotpatch.js', 'diag.js']);
+const YOLO_SCRIPTS = new Set(['run-state.js', 'notes.js', 'knowledge.js', 'mem.js', 'report.js', 'ssh-check.js', 'config.js', 'oap.js', 'tasks.js', 'hotpatch.js', 'diag.js']);
 let trustedRootsCache = null;
 
 /**
- * Plugin roots whose scripts yolo mode trusts: this plugin, its sibling odoo-squad and their marketplace installs.
+ * Plugin roots whose scripts yolo mode trusts: this plugin, its siblings odoo-squad and oap-memory and their installs.
  * A folder that merely has the same name (e.g. written inside the client repo) is not trusted.
  * @returns {string[]} normalized absolute roots
  */
 function trustedRoots() {
   if (trustedRootsCache) return trustedRootsCache;
   const own = path.resolve(__dirname, '..', '..');
-  const roots = [own, path.resolve(own, '..', 'odoo-squad')];
+  const roots = [own, path.resolve(own, '..', 'odoo-squad'), path.resolve(own, '..', 'oap-memory')];
   try {
-    const file = path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json');
+    const file = path.join(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'), 'plugins', 'installed_plugins.json');
     const installed = JSON.parse(fs.readFileSync(file, 'utf8'));
     for (const [key, entries] of Object.entries(installed.plugins || {})) {
-      if (/^(odoosh-browser|odoo-squad)@/.test(key)) for (const e of entries) if (e.installPath) roots.push(path.resolve(e.installPath));
+      if (/^(odoosh-browser|odoo-squad|oap-memory)@/.test(key)) for (const e of entries) if (e.installPath) roots.push(path.resolve(e.installPath));
     }
   } catch {
     // No marketplace install: only the checkout roots are trusted.
@@ -419,40 +419,30 @@ function evaluateSsh(args, ctx) {
 function evaluateConfigWrite(tokens) {
   const isConfigCli = tokens.some((t) => /(^|[\\/])config\.js$/.test(t)) && tokens.some((t) => ['init', 'set-staging', 'set-ssh', 'set-autonomy', 'migrate'].includes(t));
   if (isConfigCli) return { decision: ASK, reason: 'Change to the plugin configuration (staging/production branch, SSH, autonomy or file migration): confirm with the user.' };
-  // Removing knowledge (also an entry promoted to every project) or applying / undoing a memory migration always asks
-  // the user; the migration dry-run (default) and --status only read.
-  const kIdx = tokens.findIndex((t, i) => /(^|[\\/])knowledge\.js$/.test(t) || (t === 'knowledge' && /(^|[\\/])oap\.js$/.test(tokens[i - 1] || '')));
-  const kCmd = kIdx >= 0 ? tokens[kIdx + 1] : null;
-  if (kCmd === 'remove' || (kCmd === 'migrate' && tokens.some((t) => t === '--apply' || t === '--rollback'))) {
-    return { decision: ASK, reason: `knowledge.js ${kCmd}: confirm with the user.` };
-  }
   // Only real writes count: a redirection to the file or a writing program naming it (reading it with cat is free).
   const redirected = (tokens.redirects || []).some((t) => PROTECTED_PATH.test(t));
   const prog = programName(tokens[0]);
   const writer = WRITER_PROGRAMS.has(prog) || (prog === 'sed' && tokens.some((t) => /^(-i|--in-place)/.test(t) || /^-[a-zA-Z]*i/.test(t)));
   const written = writer && tokens.slice(1).some((t) => PROTECTED_PATH.test(t));
   if (redirected || written) {
-    return { decision: ASK, reason: 'Changing the plugin configuration or notes from the shell: confirm.' };
+    return { decision: ASK, reason: 'Changing the plugin configuration from the shell: confirm.' };
   }
   return null;
 }
 
 const RUN_WRITE_CMDS = new Set(['init', 'state', 'evidence', 'cycle', 'close']);
-const NOTES_WRITE_CMDS = new Set(['add', 'remove', 'migrate']);
-const KNOWLEDGE_WRITE_CMDS = new Set(['add', 'update', 'deprecate', 'remove', 'reindex', 'migrate', 'task-summary']);
 
 /**
- * Detect a subagent writing the run state, the shared memory or the knowledge stores (directly or through oap.js).
+ * Detect a subagent writing the run state (directly or through oap.js); memory writes are oap-memory's (mem-guard).
  * @param {string[]} tokens - segment tokens
  * @returns {{decision: string, reason: string}|null} decision
  */
 function evaluateSubagentStateWrite(tokens) {
   for (let i = 0; i < tokens.length - 1; i++) {
-    const m = /(^|[\\/])(run-state|notes|knowledge)(\.js)?$/.exec(tokens[i]);
+    const m = /(^|[\\/])(run-state)(\.js)?$/.exec(tokens[i]);
     if (!m || (!m[3] && !/(^|[\\/])oap\.js$/.test(tokens[i - 1] || ''))) continue;
-    const writes = { 'run-state': RUN_WRITE_CMDS, notes: NOTES_WRITE_CMDS, knowledge: KNOWLEDGE_WRITE_CMDS }[m[2]];
-    if (writes.has(tokens[i + 1])) {
-      return { decision: DENY, reason: `${m[2]}.js ${tokens[i + 1]} from a subagent blocked: hand the evidence or lesson back to the orchestrator, which records it.` };
+    if (RUN_WRITE_CMDS.has(tokens[i + 1])) {
+      return { decision: DENY, reason: `run-state.js ${tokens[i + 1]} from a subagent blocked: hand the evidence back to the orchestrator, which records it.` };
     }
   }
   return null;
@@ -612,7 +602,7 @@ function evaluateRules(event, deps) {
   if (FILE_TOOLS.has(name)) {
     const target = String(input.file_path || input.notebook_path || '');
     return CONFIG_FILE.test(target)
-      ? { decision: ASK, reason: `Direct edit of ${path.basename(target)}: confirm with the user (use config.js / notes.js).` }
+      ? { decision: ASK, reason: `Direct edit of ${path.basename(target)}: confirm with the user (use config.js).` }
       : null;
   }
   // Shell commands resolve the config per directory (git -C, cd), so they are not gated on cwd.

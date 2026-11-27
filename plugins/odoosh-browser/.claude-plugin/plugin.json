@@ -1,8 +1,19 @@
 {
   "name": "odoosh-browser",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "Completes Odoo tasks end to end: code, tests, commit, push to an Odoo.sh staging branch and verification of build, logs and tests, with deterministic safeguards.",
-  "author": { "name": "hachecito" },
+  "author": {
+    "name": "hachecito"
+  },
   "license": "MIT",
-  "keywords": ["odoo", "odoo.sh", "staging", "testing", "automation"]
+  "keywords": [
+    "odoo",
+    "odoo.sh",
+    "staging",
+    "testing",
+    "automation"
+  ],
+  "dependencies": [
+    "oap-memory"
+  ]
 }

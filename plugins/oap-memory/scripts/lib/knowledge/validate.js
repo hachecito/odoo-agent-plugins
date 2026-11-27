@@ -100,13 +100,14 @@ function validateEntry(data, body) {
  * Check whether an entry may be copied to global knowledge.
  * @param {object} data - frontmatter fields
  * @param {string} body - Markdown body
- * @param {{projectTerms?: string[]}} [ctx] - project-specific words (own module names, Odoo.sh project, staging branch)
+ * @param {{projectTerms?: string[], globalCategories?: string[]}} [ctx] - project-specific words (own module names and
+ *   the names plugins declare) and the global categories (built-in plus declared)
  * @returns {string[]} reasons it cannot be promoted (empty when it can)
  */
 function globalProblems(data, body, ctx = {}) {
   const p = [];
   if (data.status !== 'verified') p.push('only verified entries are promoted.');
-  if (!GLOBAL_CATEGORIES.includes(data.category)) p.push(`category "${data.category}" is project-specific.`);
+  if (!(ctx.globalCategories || GLOBAL_CATEGORIES).includes(data.category)) p.push(`category "${data.category}" is project-specific.`);
   if (data.type === 'task' || data.type === 'decision' || data.type === 'config') p.push(`type "${data.type}" is project-specific.`);
   const text = [data.title, data.summary, ...(data.tags || []), body].filter(Boolean).join('\n');
   for (const [re, what] of GLOBAL_PATTERNS) if (re.test(text)) p.push(`it contains ${what}.`);

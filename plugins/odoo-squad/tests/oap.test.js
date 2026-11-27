@@ -16,7 +16,7 @@ const AGENTS = path.join(__dirname, '..', 'agents');
  * @param {string} version - plugin version
  * @returns {string} install path
  */
-function fakePlugin(base, version = '0.13.0') {
+function fakePlugin(base, version = '0.14.0') {
   const dir = path.join(base, 'odoosh-browser');
   fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
   fs.mkdirSync(path.join(dir, '.claude-plugin'), { recursive: true });
@@ -49,22 +49,23 @@ test('locate: skips odoosh-browser versions older than the minimum', () => {
   const old = fakePlugin(path.join(tmp, 'old'), '0.4.0');
   assert.deepStrictEqual(locate({ OAP_ODOOSH_BROWSER: old }, tmp, tmp), { dir: null, old: '0.4.0' });
   const sibling = path.join(tmp, 'plugins');
-  fakePlugin(sibling, '0.13.0');
+  fakePlugin(sibling, '0.14.0');
   const res = locate({ OAP_ODOOSH_BROWSER: old }, tmp, path.join(sibling, 'odoo-squad', 'scripts'));
   assert.strictEqual(res.dir, path.join(sibling, 'odoosh-browser', 'scripts'));
-  assert.ok(compareVersions('0.13.1', MIN_VERSION) > 0 && compareVersions('0.12.0', MIN_VERSION) < 0 && compareVersions('0.13.0', MIN_VERSION) === 0);
+  assert.ok(compareVersions('0.14.1', MIN_VERSION) > 0 && compareVersions('0.13.0', MIN_VERSION) < 0 && compareVersions('0.14.0', MIN_VERSION) === 0);
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
 test('oap.js: runs odoosh-browser scripts with or without .js, rejects anything else', () => {
   // Pin the sibling checkout so the result does not depend on the odoosh-browser installed on this machine.
   const env = { ...process.env, OAP_ODOOSH_BROWSER: path.join(__dirname, '..', '..', 'odoosh-browser') };
-  const ok = spawnSync(process.execPath, [OAP, 'notes.js', 'show'], { cwd: os.tmpdir(), encoding: 'utf8', env });
+  const ok = spawnSync(process.execPath, [OAP, 'config.js', 'show'], { cwd: os.tmpdir(), encoding: 'utf8', env });
   assert.strictEqual(ok.status, 1); // no config in a temp dir: the script ran and reported it
-  assert.ok(/odoosh-browser\/config\.json/.test(ok.stderr), ok.stderr);
-  const short = spawnSync(process.execPath, [OAP, 'notes', 'show'], { cwd: os.tmpdir(), encoding: 'utf8', env });
-  assert.ok(/odoosh-browser\/config\.json/.test(short.stderr), short.stderr);
-  for (const bad of ['../x.js', 'a/b.js', '../x', 'nonexistent']) {
+  assert.ok(/odoosh-browser[\\/]config\.json/.test(ok.stderr), ok.stderr);
+  const short = spawnSync(process.execPath, [OAP, 'config', 'show'], { cwd: os.tmpdir(), encoding: 'utf8', env });
+  assert.ok(/odoosh-browser[\\/]config\.json/.test(short.stderr), short.stderr);
+  // The memory moved to oap-memory (mem.js): oap.js no longer runs it.
+  for (const bad of ['../x.js', 'a/b.js', '../x', 'nonexistent', 'knowledge', 'notes.js']) {
     const res = spawnSync(process.execPath, [OAP, bad], { encoding: 'utf8', env });
     assert.ok(res.status !== 0 && /Usage:/.test(res.stderr), bad);
   }
